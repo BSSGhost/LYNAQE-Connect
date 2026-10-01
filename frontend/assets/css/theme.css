@@ -1,0 +1,165 @@
+/* ==========================================================================
+   LYNAQE Connect — jetons de conception (design tokens)
+   Palette imposée :
+     #123B6D  bleu profond   → couleur principale
+     #38BDF8  bleu ciel      → accent
+     #F8FAFC  blanc cassé    → fond clair
+     #D4AF37  or doux        → touche d'élégance (logo, valeurs)
+   Deux thèmes complets : clair (défaut) et sombre.
+   ========================================================================== */
+
+:root {
+  /* Rayons, ombres, transitions -------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.16);
+
+  --transition-fast: 120ms ease;
+  --transition: 200ms ease;
+  --transition-slow: 320ms ease;
+
+  /* Rythme vertical -------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  --container: 1140px;
+  --container-narrow: 760px;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  /* Couleurs de statut (identiques dans les deux thèmes, ajustées) --------- */
+  --tone-pending-bg: #fef3c7;
+  --tone-pending-fg: #92400e;
+  --tone-received-bg: #dbeafe;
+  --tone-received-fg: #1e40af;
+  --tone-review-bg: #ede9fe;
+  --tone-review-fg: #5b21b6;
+  --tone-progress-bg: #cffafe;
+  --tone-progress-fg: #155e75;
+  --tone-done-bg: #dcfce7;
+  --tone-done-fg: #166534;
+  --tone-rejected-bg: #fee2e2;
+  --tone-rejected-fg: #991b1b;
+  --tone-archived-bg: #e2e8f0;
+  --tone-archived-fg: #334155;
+}
+
+/* --- Thème clair -------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --bg-gradient: radial-gradient(1200px 600px at 100% -10%, #e0f2fe 0%, transparent 55%),
+    radial-gradient(900px 500px at -10% 0%, #eef2ff 0%, transparent 50%);
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --surface-invert: #123b6d;
+
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-soft: #64748b;
+  --text-on-primary: #ffffff;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --primary: #123b6d;
+  --primary-hover: #0e2f57;
+  --primary-active: #0a2444;
+  --primary-soft: rgba(18, 59, 109, 0.08);
+
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --accent-soft: rgba(56, 189, 248, 0.16);
+
+  --gold: #d4af37;
+  --gold-strong: #b8942a;
+  --gold-soft: rgba(212, 175, 55, 0.16);
+
+  --danger: #b91c1c;
+  --danger-soft: rgba(185, 28, 28, 0.1);
+  --success: #15803d;
+  --success-soft: rgba(21, 128, 61, 0.12);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.12);
+
+  --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.55);
+  --overlay: rgba(15, 23, 42, 0.5);
+  --chart-grid: #e2e8f0;
+}
+
+/* --- Thème sombre ------------------------------------------------------- */
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --bg-gradient: radial-gradient(1200px 600px at 100% -10%, rgba(56, 189, 248, 0.12) 0%, transparent 55%),
+    radial-gradient(900px 500px at -10% 0%, rgba(18, 59, 109, 0.35) 0%, transparent 50%);
+  --surface: #111a2b;
+  --surface-2: #16213a;
+  --surface-3: #1f2c47;
+  --surface-invert: #e8eef7;
+
+  --text: #e8eef7;
+  --text-muted: #a7b4c7;
+  --text-soft: #8a99ae;
+  --text-on-primary: #f8fafc;
+
+  --border: #1e2a3e;
+  --border-strong: #2c3b57;
+
+  --primary: #4a7dc0;
+  --primary-hover: #5c8fd2;
+  --primary-active: #3f6fb0;
+  --primary-soft: rgba(74, 125, 192, 0.16);
+
+  --accent: #38bdf8;
+  --accent-strong: #7dd3fc;
+  --accent-soft: rgba(56, 189, 248, 0.18);
+
+  --gold: #e0c25c;
+  --gold-strong: #f0d27a;
+  --gold-soft: rgba(224, 194, 92, 0.16);
+
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.14);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+
+  --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.55);
+  --overlay: rgba(2, 6, 18, 0.7);
+  --chart-grid: #24314a;
+
+  /* Tons de statut adaptés au fond sombre */
+  --tone-pending-bg: rgba(251, 191, 36, 0.16);
+  --tone-pending-fg: #fcd34d;
+  --tone-received-bg: rgba(96, 165, 250, 0.16);
+  --tone-received-fg: #93c5fd;
+  --tone-review-bg: rgba(167, 139, 250, 0.16);
+  --tone-review-fg: #c4b5fd;
+  --tone-progress-bg: rgba(34, 211, 238, 0.16);
+  --tone-progress-fg: #67e8f9;
+  --tone-done-bg: rgba(74, 222, 128, 0.16);
+  --tone-done-fg: #86efac;
+  --tone-rejected-bg: rgba(248, 113, 113, 0.16);
+  --tone-rejected-fg: #fca5a5;
+  --tone-archived-bg: rgba(148, 163, 184, 0.16);
+  --tone-archived-fg: #cbd5e1;
+}

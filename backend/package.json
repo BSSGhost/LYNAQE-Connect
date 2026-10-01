@@ -1,0 +1,32 @@
+{
+  "name": "lynaqe-connect-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API REST de LYNAQE Connect — plateforme de collecte des idees du LYNAQE de Sedhiou",
+  "author": "Ahmadou Bamba Bousso SANKHARE",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node src/db/migrate.js",
+    "migrate:status": "node src/db/migrate.js --status",
+    "db:reset": "node src/db/migrate.js --reset",
+    "check": "node src/db/check.js",
+    "hash-password": "node scripts/hash-password.js",
+    "test": "node --import ./tests/setup.js --test tests/"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.5",
+    "zod": "^3.24.1"
+  }
+}
