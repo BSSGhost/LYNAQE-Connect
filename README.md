@@ -139,7 +139,8 @@ Ouvrez ensuite <http://localhost:3000>. Le backend sert l’API **et** le fronte
 
 ## Variables d’environnement
 
-Le fichier `.env` est à la racine du projet, **ignoré par Git**. `.env.example` documente toutes les variables.
+Le fichier `.env` est à la racine du projet, **ignoré par Git**. `.env.example` documente toutes les variables
+en développement, `.env.production.example` pour un hébergeur (Render, VPS).
 
 | Variable | Rôle |
 | --- | --- |
@@ -298,6 +299,87 @@ LYNAQE Connect/
     │   └── modules/          # suggestions, tracking, admin, statistics, meta
     └── tests/                # unitaires + intégration
 ```
+
+---
+
+## Déploiement en ligne
+
+L’application est conçue pour tourner telle quelle sur un hébergeur Node :
+elle n’écrit jamais sur le disque (les logs partent sur stdout) et résout ses
+chemins depuis son propre emplacement, donc aucun ajustement de code n’est requis.
+
+**Attention : Vercel et les Mutualisés classic ne conviennent pas** — ils ne
+gèrent ni processus Node permanent, ni base de données. Un hébergeur de type
+**Render**, **Railway** ou un **VPS Linux** convient.
+
+### Étape 1 — Publier le code
+
+Le dépôt doit contenir **tout le projet**, pas seulement `backend/` : l’application
+sert elle-même `frontend/`, `shared/` et `database/`.
+
+```bash
+git init
+git add .
+git status          # vérifiez que .env et node_modules/ sont bien ignorés
+git commit -m "LYNAQE Connect"
+```
+
+Si `.env` apparaît dans `git status`, **arrêtez-vous** : il contient vos secrets.
+
+### Étape 2 — Préparer la base de données
+
+Render ne fournit pas MySQL : il faut une base managée. **Évitez PlanetScale et
+TiDB Serverless**, qui n’acceptent pas les clés étrangères — or le schéma en utilise
+(historique, soutiens, journal de modération). **Aiven** fonctionne et convient au
+schéma (InnoDB, utf8mb4).
+
+Depuis votre machine, avec un `.env` temporaire pointant vers la base distante :
+
+```bash
+cd backend
+npm run migrate      # applique les 4 migrations
+npm run check        # vérifie le schéma
+```
+
+Si votre fournisseur exige une base non préfixée, adaptez `DB_NAME`
+(attention : `DB_CREATE_IF_MISSING=false`, la base existe déjà).
+
+### Étape 3 — Configurer Render
+
+| Champ | Valeur |
+| --- | --- |
+| Root Directory | `backend` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
+| Health Check Path | `/api/health` |
+
+Puis saisissez les variables dans **Environment**, en vous appuyant sur
+`.env.production.example`. Les deux points sensibles :
+
+- **`HOST=0.0.0.0`** — sans cela le site est inaccessible *sans erreur dans les logs*.
+  Le serveur écrit un avertissement explicite au démarrage si la valeur reste sur `127.0.0.1`.
+- **`JWT_SECRET`** —générez-en un **nouveau** pour la production, jamais celui du `.env` local.
+
+### Étape 4 — Vérifier
+
+```bash
+curl https://votre-domaine/api/health      # doit répondre ok
+curl https://votre-domaine/api/meta        # 7 statuts, 8 catégories
+```
+
+Puis, dans le navigateur : déposer une suggestion, la suivre, et vous connecter
+à `#/admin`.
+
+### Limites connues en hébergement mutualisé type Render
+
+- **Mise en veille** : le service gratuit s’endort après quelques minutes
+  d’inactivité ; la première visite attend ensuite le redémarrage (~30 s).
+- **Quotas approximatifs** : la limitation de débit est stockée en mémoire, donc
+  par instance. Sur plusieurs instances, les quotas ne sont pas partagés.
+  Pour un usage scolaire cela reste acceptable ; pour un service très exposé,
+  il faudrait un compteur en base ou Redis.
+- **Sauvegardes** : aucune automatique. Exportez régulièrement vos données,
+  car une offre gratuite peut être interrompue sans préavis.
 
 ---
 

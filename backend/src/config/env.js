@@ -18,14 +18,19 @@ export const ENV_FILE = path.join(PROJECT_ROOT, '.env');
 
 const configProblems = [];
 
+/** Vrai quand aucun `.env` n'a ete trouve et que l'on tourne en production. */
+let envFileMissing = false;
+
 if (existsSync(ENV_FILE)) {
   // `override: false` : les variables reellement definies dans
   // l'environnement du systeme restent prioritaires (utile en production).
   dotenv.config({ path: ENV_FILE, override: false, quiet: true });
 } else if (process.env.NODE_ENV === 'production') {
-  configProblems.push(
-    'Fichier .env introuvable. En production, fournissez les variables via l\'environnement du serveur.',
-  );
+  // Sur un hebergeur (Render, Railway, VPS...), le fichier n'est volontairement
+  // pas deploye : les variables viennent de l'environnement du serveur. Absence
+  // de `.env` = avertissement, pas erreur fatale. Si une variable obligatoire
+  // manque vraiment, elle est signalee plus bas comme probleme bloquant.
+  envFileMissing = true;
 }
 
 /**
@@ -179,6 +184,11 @@ export const paths = Object.freeze({
 /** Signale la presence de configuration de developpement non securisee. */
 export function collectWarnings() {
   const warnings = [];
+  if (envFileMissing) {
+    warnings.push(
+      'Aucun fichier .env : configuration lue depuis l\'environnement du serveur (normal sur un hebergeur).',
+    );
+  }
   if (!config.isProduction) {
     if (!config.admin.passwordHash) {
       warnings.push('ADMIN_PASSWORD_HASH absent : le mot de passe ADMIN_PASSWORD sera hache au demarrage.');
@@ -189,6 +199,13 @@ export function collectWarnings() {
     if (!config.db.ssl && config.db.host !== 'localhost' && config.db.host !== '127.0.0.1') {
       warnings.push('DB_SSL=false alors que DB_HOST est distant.');
     }
+  } else if (config.server.host === '127.0.0.1' || config.server.host === 'localhost') {
+    // Piege classique des hebergeurs : une app ecoutee uniquement sur la
+    //boucle locale reste inaccessible depuis l'exterieur.
+    warnings.push(
+      'HOST vaut ' + config.server.host + ' alors que NODE_ENV=production : ' +
+        'definis HOST=0.0.0.0 sur ton hebergeur, sinon aucune requete externe n\'atteindra le serveur.',
+    );
   }
   if (config.admin.password && config.admin.passwordHash) {
     warnings.push(
