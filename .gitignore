@@ -1,0 +1,33 @@
+# Dependances
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Variables d'environnement (NE JAMAIS COMMITER)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Certificats / cles
+*.pem
+*.key
+
+# Artefacts de build
+dist/
+build/
+.cache/
+.vite/
+
+# Systeme / OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Fichiers temporaires de test
+tmp/
