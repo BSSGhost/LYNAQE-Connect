@@ -29,6 +29,7 @@ export async function render() {
       title: 'Proposer une idée',
       lead: 'Décris ton idée le plus clairement possible. Toutes les suggestions sont examinées par l’équipe de modération.',
     })}
+    <div class="submit-layout">
     <form class="form" id="suggestion-form" novalidate>
       <div class="field">
         <label for="title">Titre de l’idée <span class="req">*</span></label>
@@ -84,13 +85,22 @@ export async function render() {
         </div>
       </fieldset>
 
-      <p class="notice">${icon('info', { size: 16 })} ${esc(PROJECT.afterSubmitMessage)}</p>
-
       <div class="form-actions">
         <a class="btn btn-ghost" href="${href(ROUTES.home)}">Annuler</a>
         <button class="btn btn-primary btn-lg" type="submit" id="submit-button">${icon('send', { size: 18 })} Envoyer ma suggestion</button>
       </div>
     </form>
+    <aside class="panel after-submit-card">
+      <h2>${icon('shieldCheck', { size: 20 })} Après l’envoi</h2>
+      <p class="field-hint">${esc(PROJECT.afterSubmitMessage)}</p>
+      <ol class="after-submit-steps">
+        <li><span>1</span>Envoi</li>
+        <li><span>2</span>Examen</li>
+        <li><span>3</span>Étude</li>
+        <li><span>4</span>Traitement</li>
+      </ol>
+    </aside>
+    </div>
     `,
   );
 

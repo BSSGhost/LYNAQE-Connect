@@ -10,6 +10,7 @@ import { el } from '../core/dom.js';
 
 const LINKS = [
   { path: ROUTES.home, label: 'Accueil' },
+  { path: ROUTES.submit, label: 'Proposer une idée' },
   { path: ROUTES.suggestions, label: 'Suggestions' },
   { path: ROUTES.howItWorks, label: 'Comment ça marche' },
   { path: ROUTES.about, label: 'À propos' },

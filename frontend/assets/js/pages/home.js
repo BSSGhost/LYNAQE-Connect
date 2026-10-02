@@ -12,9 +12,11 @@ import { loadingHtml } from '../components/layout.js';
 import { suggestionListHtml } from '../components/suggestions.js';
 
 const STEPS = [
-  { icon: 'lightbulb', title: 'Tu as une idée', text: 'Un constat, une proposition pour améliorer la vie du lycée.' },
-  { icon: 'send', title: 'Tu la déposes', text: 'Une seule page, anonyme si tu le souhaites, et un reçu de suivi immédiat.' },
-  { icon: 'shieldCheck', title: 'Elle est examinée', text: 'L’équipe de modération vérifie, publie si elle est conforme, puis suit sa réalisation.' },
+  { number: '01', icon: 'lightbulb', title: 'Proposer', text: 'Partage ton idée ou signale un problème concret.' },
+  { number: '02', icon: 'search', title: 'Examiner', text: 'La suggestion est vérifiée par l’équipe de modération.' },
+  { number: '03', icon: 'book', title: 'Étudier', text: 'Sa faisabilité et son intérêt pour le lycée sont étudiés.' },
+  { number: '04', icon: 'refresh', title: 'Agir', text: 'Lorsqu’elle avance, son statut est mis à jour.' },
+  { number: '05', icon: 'checkCircle', title: 'Réaliser', text: 'Les propositions retenues peuvent être concrètement réalisées.' },
 ];
 
 export async function render() {
@@ -33,6 +35,7 @@ export async function render() {
 
   const steps = STEPS.map(
     (step) => `<article class="feature">
+      <span class="step-number">${step.number}</span>
       <span class="feature-icon">${icon(step.icon, { size: 24 })}</span>
       <h3>${step.title}</h3>
       <p>${step.text}</p>
@@ -40,7 +43,11 @@ export async function render() {
   ).join('');
 
   const categories = CATEGORY_META.map(
-    (category) => `<li class="chip">${icon(category.icon, { size: 15 })}${category.value}</li>`,
+    (category) => `<article class="category-card">
+      <span class="category-icon">${icon(category.icon, { size: 22 })}</span>
+      <h3>${category.value}</h3>
+      <p>${category.description}</p>
+    </article>`,
   ).join('');
 
   const latest = items.length
@@ -59,21 +66,38 @@ export async function render() {
       <div class="hero-inner">
         <div class="hero-copy">
           <p class="eyebrow">${PROJECT.school}</p>
-          <h1>${PROJECT.tagline}</h1>
+          <h1>${PROJECT.name}</h1>
+          <p class="hero-tagline">${PROJECT.tagline}</p>
           <p class="lead">
-            ${PROJECT.name} permet à chaque élève de proposer une idée pour le lycée, de la
-            soutenir et de suivre son avancement, en toute transparence.
+            Propose une idée, signale un problème et participe à l’amélioration du lycée.
+            Chaque suggestion peut être suivie et, lorsqu’elle est publiée, soutenue par les autres élèves.
           </p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="${href(ROUTES.submit)}">${icon('plus', { size: 18 })} Proposer une idée</a>
             <a class="btn btn-outline btn-lg" href="${href(ROUTES.suggestions)}">${icon('list', { size: 18 })} Voir les suggestions</a>
+            <a class="btn btn-ghost btn-lg" href="${href(ROUTES.track)}">${icon('search', { size: 18 })} Suivre ma suggestion</a>
           </div>
         </div>
         <div class="hero-art" aria-hidden="true">
-          <div class="hero-card">
-            <span class="hero-card-icon">${icon('lightbulb', { size: 30 })}</span>
-            <strong>${total === null ? 'Ton idée' : formatNumber(total)}</strong>
-            <span>${total === null ? 'peut tout changer' : `idée${total > 1 ? 's' : ''} partagée${total > 1 ? 's' : ''}`}</span>
+          <div class="hero-dashboard">
+            <div class="hero-dashboard-top">
+              <span class="hero-mini-logo">${icon('logo', { size: 20 })}</span>
+              <span>${PROJECT.name}</span>
+              <span class="hero-notification">${icon('info', { size: 15 })}</span>
+            </div>
+            <div class="hero-idea">
+              <span class="hero-idea-icon">${icon('lightbulb', { size: 24 })}</span>
+              <div><strong>Une idée pour le lycée</strong><small>Partage • écoute • action</small></div>
+            </div>
+            <div class="hero-suggestion">
+              <div><span class="hero-dot"></span><span>Améliorer les espaces d’étude</span></div>
+              <span class="badge tone-progress">En cours</span>
+            </div>
+            <div class="hero-stats">
+              <div><strong>${total === null ? '—' : formatNumber(total)}</strong><span>suggestions</span></div>
+              <div><strong>5</strong><span>étapes</span></div>
+              <div><strong>∞</strong><span>idées</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -81,13 +105,13 @@ export async function render() {
 
     <section class="container section">
       <h2 class="section-title">Comment ça marche</h2>
-      <div class="features">${steps}</div>
+      <div class="features process-steps">${steps}</div>
       <p class="section-more"><a class="link-more" href="${href(ROUTES.howItWorks)}">En savoir plus ${icon('arrowRight', { size: 15 })}</a></p>
     </section>
 
     <section class="container section">
       <h2 class="section-title">Les catégories</h2>
-      <ul class="chips">${categories}</ul>
+      <div class="category-grid">${categories}</div>
     </section>
 
     <section class="container section">

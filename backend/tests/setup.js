@@ -14,7 +14,16 @@
  *   ne soit importé par les fichiers de test.
  */
 
-process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
+process.env.NODE_ENV = 'test';
+
+// Les tests doivent toujours viser une base MySQL locale dédiée par défaut.
+// Les variables TEST_DB_* permettent d'utiliser un autre serveur de test,
+// mais jamais les variables DB_* de production du fichier .env.
+process.env.DB_HOST = process.env.TEST_DB_HOST ?? '127.0.0.1';
+process.env.DB_PORT = process.env.TEST_DB_PORT ?? '3306';
+process.env.DB_USER = process.env.TEST_DB_USER ?? 'root';
+process.env.DB_PASSWORD = process.env.TEST_DB_PASSWORD ?? '';
+process.env.DB_SSL = process.env.TEST_DB_SSL ?? 'false';
 process.env.DB_NAME = process.env.TEST_DB_NAME ?? 'lynaqe_connect_test';
 process.env.RATE_LIMIT_ENABLED = 'false';
 process.env.LOG_LEVEL = 'silent';
