@@ -70,8 +70,7 @@ async function load(context) {
     wireRows(container, query);
     wirePagination(container, query);
   } catch (error) {
-    handleAdminError(error);
-    container.innerHTML = `<div class="state-block state-error" role="alert">${icon('alert', { size: 32 })}<h2>Erreur</h2><p>${esc(error.message)}</p></div>`;
+    container.innerHTML = '<div class="state-block state-error">Erreur lors du chargement</div>';
   }
 }
 
