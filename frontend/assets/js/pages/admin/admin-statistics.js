@@ -1,6 +1,6 @@
 /**
  * Administration — tableau de bord statistique.
- * Tous les chiffres proviennent de `GET /api/admin/statistiques` (MySQL réel).
+ * Interface moderne et professionnelle avec KPI cards et graphiques.
  */
 
 import { ROUTES } from '../../../../../shared/constants.js';
@@ -11,7 +11,7 @@ import { adminApi } from '../../core/api.js';
 import { formatDate, formatDateTime, formatNumber, formatPercent } from '../../core/format.js';
 import { loadingHtml, statCardHtml, emptyStateHtml } from '../../components/layout.js';
 import { lineChartSvg, barChartSvg, horizontalBarsHtml } from '../../components/charts.js';
-import { guardAdmin, handleAdminError, adminNavHtml, wireAdminBar } from './admin-shell.js';
+import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
 
 const shortDay = (value) => {
@@ -26,18 +26,25 @@ const shortMonth = (value) => {
 export async function render() {
   if (!guardAdmin()) return;
   const main = document.getElementById('main');
-  mount(main, `${adminNavHtml(ROUTES.adminStatistics)}${loadingHtml('Calcul des statistiques…')}`);
+  // Sidebar + header + content
+  mount(
+    main,
+    `${sidebarHtml(ROUTES.adminStatistics)}${adminNavHtml(ROUTES.adminStatistics)}${loadingHtml('Calcul des statistiques…')}`,
+  );
   wireAdminBar(() => logoutAdmin());
 
   try {
     const { data } = await adminApi.statistics();
-    mount(main, `${adminNavHtml(ROUTES.adminStatistics)}${data.isEmpty ? emptyHtml() : dashboardHtml(data)}`);
+    mount(
+      main,
+      `${sidebarHtml(ROUTES.adminStatistics)}${adminNavHtml(ROUTES.adminStatistics)}${data.isEmpty ? emptyHtml() : dashboardHtml(data)}`,
+    );
     wireAdminBar(() => logoutAdmin());
   } catch (error) {
     handleAdminError(error);
     mount(
       main,
-      `${adminNavHtml(ROUTES.adminStatistics)}<div class="state-block state-error" role="alert">${icon('alert', { size: 32 })}<h2>Erreur</h2><p>${esc(error.message)}</p></div>`,
+      `${sidebarHtml(ROUTES.adminStatistics)}${adminNavHtml(ROUTES.adminStatistics)}<div class="state-block state-error" role="alert">${icon('alert', { size: 32 })}<h2>Erreur</h2><p>${esc(error.message)}</p></div>`,
     );
     wireAdminBar(() => logoutAdmin());
   }
@@ -56,13 +63,9 @@ function dashboardHtml(data) {
 
   const cards = [
     statCardHtml({ label: 'Suggestions reçues', value: formatNumber(t.suggestions), icon: 'inbox', tone: 'info' }),
-    statCardHtml({ label: 'Publiées', value: formatNumber(t.published), icon: 'megaphone', tone: 'progress' }),
-    statCardHtml({ label: 'Réalisées', value: formatNumber(t.realized), icon: 'checkCircle', tone: 'done' }),
-    statCardHtml({ label: 'En cours', value: formatNumber(t.running), icon: 'refresh', tone: 'progress' }),
     statCardHtml({ label: 'En attente', value: formatNumber(t.pending), icon: 'clock', tone: 'pending' }),
-    statCardHtml({ label: 'Soutiens', value: formatNumber(t.supports), icon: 'thumbsUp', tone: 'received' }),
-    statCardHtml({ label: 'Suggestions soutenues', value: formatNumber(t.supportedSuggestions), icon: 'users', tone: 'review' }),
-    statCardHtml({ label: 'Anonymes', value: formatNumber(t.anonymous), icon: 'user', tone: 'neutral' }),
+    statCardHtml({ label: 'En cours', value: formatNumber(t.running), icon: 'refresh', tone: 'progress' }),
+    statCardHtml({ label: 'Réalisées', value: formatNumber(t.realized), icon: 'checkCircle', tone: 'done' }),
   ].join('');
 
   const indicators = [

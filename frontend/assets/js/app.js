@@ -23,6 +23,7 @@ import * as about from './pages/about.js';
 import * as rules from './pages/rules.js';
 import * as privacy from './pages/privacy.js';
 import * as notFound from './pages/not-found.js';
+
 import * as adminLogin from './pages/admin/admin-login.js';
 import * as adminSuggestions from './pages/admin/admin-suggestions.js';
 import * as adminSuggestionDetail from './pages/admin/admin-suggestion-detail.js';
@@ -32,6 +33,10 @@ import * as adminLogs from './pages/admin/admin-logs.js';
 function currentPath() {
   const hash = window.location.hash.replace(/^#/, '') || '/';
   return `/${hash.split('?')[0].split('/').filter(Boolean).join('/')}`;
+}
+
+function isAdminRoute(path) {
+  return path === '/admin' || path.startsWith('/admin/');
 }
 
 function bootstrap() {
@@ -59,6 +64,13 @@ function bootstrap() {
 
   const afterNav = () => {
     setActiveNav(currentPath());
+    // Mettre à jour la classe admin pour afficher/cacher la sidebar
+    const html = document.documentElement;
+    if (isAdminRoute(currentPath())) {
+      html.setAttribute('data-admin', '');
+    } else {
+      html.removeAttribute('data-admin');
+    }
     scrollTop();
     document.getElementById('main')?.focus?.();
   };

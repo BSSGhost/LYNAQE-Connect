@@ -1,5 +1,6 @@
 /**
  * Administration — journal de modération (historique des actions).
+ * Interface moderne et professionnelle.
  */
 
 import { MODERATION_ACTIONS, ROUTES } from '../../../../../shared/constants.js';
@@ -11,7 +12,7 @@ import { formatNumber } from '../../core/format.js';
 import { loadingHtml } from '../../components/layout.js';
 import { moderationLogHtml } from '../../components/suggestions.js';
 import { paginationHtml } from '../../components/pagination.js';
-import { guardAdmin, handleAdminError, adminNavHtml, wireAdminBar } from './admin-shell.js';
+import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
 
 const ACTION_LABELS = {
@@ -31,7 +32,11 @@ export async function render(context) {
   const main = document.getElementById('main');
   const query = normalizedQuery(context.query);
 
-  mount(main, `${adminNavHtml(ROUTES.adminLogs)}${filtersHtml(query)}<div id="logs-results">${loadingHtml()}</div>`);
+  // Sidebar + header + content
+  mount(
+    main,
+    `${sidebarHtml(ROUTES.adminLogs)}${adminNavHtml(ROUTES.adminLogs)}${filtersHtml(query)}${loadingHtml()}<div id="logs-results"></div>`,
+  );
   wireAdminBar(() => logoutAdmin());
   wireFilters(main, query);
   await load(context);
@@ -50,11 +55,11 @@ async function load(context) {
 
     container.innerHTML = data.length
       ? `<p class="result-count">${formatNumber(meta.total)} entrée${meta.total > 1 ? 's' : ''}</p>
-         <div class="table-wrap"><table class="data-table">
-           <thead><tr><th>Action</th><th>Suggestion</th><th>Nouveau statut</th><th>Acteur</th><th>Date</th></tr></thead>
-           <tbody>${data.map(moderationLogHtml).join('')}</tbody>
-         </table></div>
-         ${paginationHtml(meta)}`
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Action</th><th>Suggestion</th><th>Nouveau statut</th><th>Acteur</th><th>Date</th></tr></thead>
+            <tbody>${data.map(moderationLogHtml).join('')}</tbody>
+          </table></div>
+          ${paginationHtml(meta)}
       : `<div class="state-block state-empty">${icon('journal', { size: 36 })}<h2>Aucune entrée</h2><p>Le journal est vide pour ces critères.</p></div>`;
 
     wirePagination(container, query);
@@ -77,22 +82,6 @@ function filtersHtml(query) {
     <div class="field"><select name="action"><option value="">Toutes les actions</option>${actions}</select></div>
     <button class="btn btn-outline" type="submit">${icon('filter', { size: 16 })} Filtrer</button>
   </form>`;
-}
-
-function wireFilters(main, query) {
-  const form = main.querySelector('#logs-filter-bar');
-  form.querySelector('[name="action"]').value = query.action;
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    navigate(
-      buildHash({
-        page: 1,
-        action: String(data.get('action') ?? ''),
-        suggestionId: String(data.get('suggestionId') ?? '').trim(),
-      }),
-    );
-  });
 }
 
 function wirePagination(container, query) {

@@ -1,5 +1,6 @@
 /**
  * Écran de connexion à l'administration (un seul mot de passe, aucun compte).
+ * Refonte UI/UX premium et minimaliste.
  */
 
 import { ROUTES } from '../../../../../shared/constants.js';
@@ -7,7 +8,6 @@ import { mount } from '../../core/dom.js';
 import { href, navigate } from '../../core/router.js';
 import { icon } from '../../core/icons.js';
 import { adminApi } from '../../core/api.js';
-import { isAdmin, setAdminToken } from '../../core/store.js';
 import { toast } from '../../core/ui.js';
 
 export async function render() {
@@ -25,16 +25,16 @@ export async function render() {
 
   mount(
     main,
-    `<div class="admin-login">
+    `<div class="admin-login" role="dialog" aria-modal="true" aria-label="Connexion administration">
       <form class="panel login-card" id="login-form" novalidate>
         <span class="login-mark">${icon('lock', { size: 30 })}</span>
         <h1>Espace administration</h1>
-        <p class="field-hint">Accès réservé à l’équipe de modération du lycée.</p>
+        <p class="field-hint">Gérez les suggestions et participez à l'amélioration de votre lycée.</p>
 
         <div class="field">
           <label for="password">Mot de passe</label>
           <div class="input-group">
-            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe administrateur" required />
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
             <button class="btn btn-icon btn-ghost" type="button" id="toggle-password" aria-label="Afficher le mot de passe">${icon('eye', { size: 18 })}</button>
           </div>
           <div class="field-foot"><span class="error" data-error="password"></span></div>
@@ -78,7 +78,7 @@ export async function render() {
       toast('Connexion réussie. Bienvenue !', 'success');
       navigate(ROUTES.adminSuggestions, { replace: true });
     } catch (error) {
-      const message = error.status === 403 ? 'Mot de passe administrateur incorrect.' : error.message;
+      const message = error.status === 403 ? 'Mot de passe incorrect. Veuillez réessayer.' : error.message;
       errorSlot.textContent = message;
       form.querySelector('.field')?.classList.add('has-error');
       toast(message, 'error');

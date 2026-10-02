@@ -25,7 +25,7 @@ export async function render(context) {
   const main = document.getElementById('main');
   const query = normalizedQuery(context.query);
 
-  mount(main, `${headerHtml()}${loadingHtml()}`);
+  mount(main, headerHtml());
 
   wireFilterBar(main, query);
 
@@ -106,7 +106,7 @@ function headerHtml() {
       </div>
       <button class="btn btn-outline" type="submit">${icon('filter', { size: 16 })} Filtrer</button>
     </form>
-    <div id="suggestions-results"></div>`;
+    <div id="suggestions-results">${loadingHtml()}</div>`;
 }
 
 function wireFilterBar(main, query) {

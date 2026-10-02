@@ -1,5 +1,6 @@
 /**
  * Administration — liste et modération rapide des suggestions.
+ * Interface moderne et professionnelle.
  */
 
 import {
@@ -17,7 +18,7 @@ import { toast, confirmDialog } from '../../core/ui.js';
 import { loadingHtml, emptyStateHtml } from '../../components/layout.js';
 import { statusBadge } from '../../components/suggestions.js';
 import { paginationHtml } from '../../components/pagination.js';
-import { guardAdmin, handleAdminError, adminNavHtml, wireAdminBar } from './admin-shell.js';
+import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
 
 const SORTS = [
@@ -33,7 +34,11 @@ export async function render(context) {
   const main = document.getElementById('main');
   const query = normalizedQuery(context.query);
 
-  mount(main, `${adminNavHtml(ROUTES.adminSuggestions)}${filtersHtml(query)}<div id="admin-results">${loadingHtml()}</div>`);
+  // Sidebar + header + content
+  mount(
+    main,
+    `${sidebarHtml(ROUTES.adminSuggestions)}${adminNavHtml(ROUTES.adminSuggestions)}${filtersHtml(query)}${loadingHtml()}<div id="admin-results"></div>`,
+  );
   wireAdminBar(() => logoutAdmin());
   wireFilters(main, query);
   await load(context);
@@ -55,11 +60,11 @@ async function load(context) {
 
     container.innerHTML = data.length
       ? `<p class="result-count">${formatNumber(meta.total)} suggestion${meta.total > 1 ? 's' : ''}</p>
-         <div class="table-wrap"><table class="data-table">
-           <thead><tr><th>Idée</th><th>Statut</th><th>Visibilité</th><th>Soutiens</th><th>Reçue le</th><th>Actions</th></tr></thead>
-           <tbody>${data.map(rowHtml).join('')}</tbody>
-         </table></div>
-         ${paginationHtml(meta)}`
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Suggestion</th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>
+            <tbody>${data.map(rowHtml).join('')}</tbody>
+          </table></div>
+          ${paginationHtml(meta)}
       : emptyStateHtml({ message: 'Aucune suggestion ne correspond à ces filtres.', title: 'Aucun résultat', ctaHref: '' });
 
     wireRows(container, query);
@@ -71,30 +76,42 @@ async function load(context) {
 }
 
 function rowHtml(suggestion) {
-  const statusOptions = SUGGESTION_STATUSES.map(
-    (status) => `<option value="${esc(status)}" ${status === suggestion.status ? 'selected' : ''}>${esc(status)}</option>`,
-  ).join('');
-
+  const statusMeta = getStatusMeta(suggestion.status);
   return `<tr data-row="${suggestion.id}">
     <td>
-      <a class="cell-title" href="${href(`${ROUTES.adminSuggestions}/${suggestion.id}`)}">${esc(suggestion.title)}</a>
-      <div class="cell-sub">${esc(suggestion.trackingCode ?? '')} · ${esc(suggestion.category)}</div>
+      <div class="cell-title-wrapper">
+        <a class="cell-title" href="${href(`${ROUTES.adminSuggestions}/${suggestion.id}`)}">${esc(suggestion.title)}</a>
+        <div class="cell-sub">${esc(suggestion.trackingCode ?? '')} · ${esc(suggestion.category)}</div>
+      </div>
     </td>
-    <td class="cell-status">${statusBadge(suggestion.statusInfo)}</td>
     <td>
-      <button class="pill ${suggestion.visibility === 'publique' ? 'pill-public' : 'pill-private'}" type="button" data-toggle-visibility="${suggestion.id}" data-visibility="${esc(suggestion.visibility)}">
-        ${icon(suggestion.visibility === 'publique' ? 'eye' : 'eyeOff', { size: 14 })}
-        ${suggestion.visibility === 'publique' ? 'Publiée' : 'Non publiée'}
-      </button>
+      <span class="category-tag">${categoryTagInfo(suggestion.category)}</span>
+    </td>
+    <td class="cell-date">${esc(formatDate(suggestion.createdAt))}</td>
+    <td class="cell-status">
+      <span class="badge tone-${statusMeta?.tone ?? 'neutral'}"><span class="dot"></span>${esc(suggestion.status)}</span>
     </td>
     <td>${formatNumber(suggestion.supportCount)}</td>
-    <td class="cell-sub">${esc(formatDate(suggestion.createdAt))}</td>
     <td class="cell-actions">
-      <select class="select-sm" data-status-for="${suggestion.id}" aria-label="Changer le statut">${statusOptions}</select>
-      <a class="btn btn-icon btn-ghost" href="${href(`${ROUTES.adminSuggestions}/${suggestion.id}`)}" aria-label="Ouvrir le détail">${icon('edit', { size: 16 })}</a>
+      <select class="status-select" data-status-for="${suggestion.id}" aria-label="Changer le statut">
+        ${SUGGESTION_STATUSES.map(
+          (s) => `<option value="${esc(s)}" ${s === suggestion.status ? 'selected' : ''}>${esc(s)}</option>`,
+        ).join('')}
+      </select>
+      <a class="btn btn-icon btn-ghost" href="${href(`${ROUTES.adminSuggestions}/${suggestion.id}`)}" aria-label="Ouvrir le détail">${icon('eye', { size: 16 })}</a>
       <button class="btn btn-icon btn-ghost danger" type="button" data-delete="${suggestion.id}" data-title="${esc(suggestion.title)}" aria-label="Supprimer">${icon('trash', { size: 16 })}</button>
     </td>
   </tr>`;
+}
+
+function categoryTagInfo(categoryValue) {
+  const meta = CATEGORY_BY_VALUE[categoryValue];
+  if (!meta) return categoryValue;
+  return `<span class="tag"><span class="dot"></span>${esc(meta.value)}</span>`;
+}
+
+function getStatusMeta(value) {
+  return STATUS_BY_VALUE[value] ?? null;
 }
 
 function wireRows(container, query) {
@@ -158,7 +175,8 @@ function wireRows(container, query) {
 function updateRowStatus(container, id, suggestion) {
   const row = container.querySelector(`[data-row="${id}"]`);
   if (!row || !suggestion) return;
-  row.querySelector('.cell-status').innerHTML = statusBadge(suggestion.statusInfo);
+  const statusMeta = getStatusMeta(suggestion.status);
+  row.querySelector('.cell-status').innerHTML = `<span class="badge tone-${statusMeta?.tone ?? 'neutral'}"><span class="dot"></span>${esc(suggestion.statusInfo?.value ?? suggestion.status)}</span>`;
   const toggle = row.querySelector('[data-toggle-visibility]');
   if (toggle) {
     const isPublic = suggestion.visibility === 'publique';
@@ -195,29 +213,6 @@ function filtersHtml(query) {
     <div class="field"><select name="sort">${sortOptions}</select></div>
     <button class="btn btn-outline" type="submit">${icon('filter', { size: 16 })} Filtrer</button>
   </form>`;
-}
-
-function wireFilters(main, query) {
-  const form = main.querySelector('#admin-filter-bar');
-  form.querySelector('[name="category"]').value = query.category;
-  form.querySelector('[name="status"]').value = query.status;
-  form.querySelector('[name="visibility"]').value = query.visibility;
-  form.querySelector('[name="sort"]').value = query.sort;
-
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    navigate(
-      buildHash({
-        page: 1,
-        search: String(data.get('search') ?? '').trim(),
-        category: String(data.get('category') ?? ''),
-        status: String(data.get('status') ?? ''),
-        visibility: String(data.get('visibility') ?? ''),
-        sort: String(data.get('sort') ?? 'recent'),
-      }),
-    );
-  });
 }
 
 function normalizedQuery(raw = {}) {

@@ -137,7 +137,86 @@ ol {
   width: 100%;
 }
 
+/* Administration : sidebar fixe et header collant */
+[data-admin] {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--space-6);
+  min-height: 100vh;
+}
+
+[data-admin] .admin-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: fit-content;
+  border-right: 1px solid var(--border);
+  z-index: 99;
+}
+
+[data-admin] .admin-header {
+  position: sticky;
+  top: 260px;
+  left: 260px;
+  right: 0;
+  z-index: 90;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-admin] .admin-main {
+  margin-left: 260px;
+  padding: var(--space-6);
+  margin-top: 64px;
+}
+
+[data-admin] .admin-main.collapsed {
+  margin-left: 0;
+}
+
+@media (max-width: 900px) {
+  [data-admin] {
+    grid-template-columns: 1fr;
+  }
+
+  [data-admin] .admin-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    z-index: 100;
+  }
+
+  [data-admin] .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  [data-admin] .admin-header {
+    position: fixed;
+    left: 260px;
+    top: 0;
+    z-index: 80;
+  }
+
+  [data-admin] .admin-main {
+    margin-left: 0;
+    margin-top: 64px;
+    padding: var(--space-4);
+  }
+}
+
 .container {
+  width: min(100% - 2rem, var(--container));
+  margin-inline: auto;
+}
+
+/* Les pages internes posent leurs blocs directement dans le main : on leur
+   applique la largeur standard pour un espacement identique à l'accueil.
+   Les éléments volontairement pleine largeur sont exclus (héros, barre
+   d'administration) ainsi que les conteneurs déjà dimensionnés. */
+.site-main
+  > *:not(.hero):not(.admin-bar):not(.container):not(.container-narrow) {
   width: min(100% - 2rem, var(--container));
   margin-inline: auto;
 }

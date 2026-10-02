@@ -52,6 +52,10 @@
   height: 24px;
 }
 
+.brand-text {
+  white-space: nowrap;
+}
+
 .brand-text small {
   display: block;
   font-size: 0.7rem;
@@ -97,6 +101,22 @@
   gap: var(--space-2);
 }
 
+.header-actions .btn {
+  white-space: nowrap;
+}
+
+/* Entre 1080 et 1240 px : le bandeau se resserre pour que la marque, la
+   navigation et le bouton principal tiennent sans jamais se couper. */
+@media (max-width: 1240px) {
+  .header-inner {
+    gap: var(--space-2);
+  }
+
+  .nav a {
+    padding-inline: var(--space-2);
+  }
+}
+
 .nav-toggle {
   display: none;
 }
@@ -129,7 +149,7 @@
   display: block;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .nav-toggle {
     display: inline-grid;
     place-items: center;
@@ -436,6 +456,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+}
+
+/* Sections empilées d'une page : garder un rythme vertical régulier au lieu
+   de laisser les bordures se toucher. */
+.panel + .panel,
+.panel + .cta-band {
+  margin-top: var(--space-5);
 }
 
 .panel-header {
