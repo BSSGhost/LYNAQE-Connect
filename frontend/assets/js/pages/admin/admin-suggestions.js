@@ -6,6 +6,8 @@
 import {
   SUGGESTION_STATUSES,
   CATEGORY_META,
+  CATEGORY_BY_VALUE,
+  STATUS_BY_VALUE,
   ROUTES,
   LIMITS,
 } from '../../../../../shared/constants.js';
@@ -16,7 +18,6 @@ import { adminApi } from '../../core/api.js';
 import { formatDate, formatNumber } from '../../core/format.js';
 import { toast, confirmDialog } from '../../core/ui.js';
 import { loadingHtml, emptyStateHtml } from '../../components/layout.js';
-import { statusBadge } from '../../components/suggestions.js';
 import { paginationHtml } from '../../components/pagination.js';
 import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
@@ -31,14 +32,19 @@ const SORTS = [
 
 export async function render(context) {
   if (!guardAdmin()) return;
+
   const main = document.getElementById('main');
   const query = normalizedQuery(context.query);
 
-  // Sidebar + header + content
   mount(
     main,
-    `${sidebarHtml(ROUTES.adminSuggestions)}${adminNavHtml(ROUTES.adminSuggestions)}${filtersHtml(query)}${loadingHtml()}<div id="admin-results"></div>`,
+    sidebarHtml(ROUTES.adminSuggestions)
+      + adminNavHtml(ROUTES.adminSuggestions)
+      + filtersHtml(query)
+      + loadingHtml()
+      + '<div id="admin-results"></div>',
   );
+
   wireAdminBar(() => logoutAdmin());
   wireFilters(main, query);
   await load(context);
@@ -47,6 +53,7 @@ export async function render(context) {
 async function load(context) {
   const container = document.getElementById('admin-results');
   const query = normalizedQuery(context.query);
+
   try {
     const { data, meta } = await adminApi.suggestions({
       page: query.page,
@@ -58,16 +65,23 @@ async function load(context) {
       sort: query.sort || undefined,
     });
 
-    container.innerHTML = data.length
-      ? `<p class="result-count">${formatNumber(meta.total)} suggestion${meta.total > 1 ? 's' : ''}</p>
-          <div class="table-wrap"><table class="data-table">
-            <thead><tr><th>Suggestion</th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>
-            <tbody>${data.map(rowHtml).join('')}</tbody>
-          </table></div>
-          ${paginationHtml(meta)}
-      : emptyStateHtml({ message: 'Aucune suggestion ne correspond à ces filtres.', title: 'Aucun résultat', ctaHref: '' });
+    if (data.length) {
+      container.innerHTML =
+        '<p class="result-count">' + formatNumber(meta.total) + ' suggestion' + (meta.total > 1 ? 's' : '') + '</p>' +
+        '<div class="table-wrap"><table class="data-table">' +
+        '<thead><tr><th>Suggestion</th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>' +
+        '<tbody>' + data.map(rowHtml).join('') + '</tbody>' +
+        '</table></div>' +
+        paginationHtml(meta);
+    } else {
+      container.innerHTML = emptyStateHtml({
+        message: 'Aucune suggestion ne correspond à ces filtres.',
+        title: 'Aucun résultat',
+        ctaHref: '',
+      });
+    }
 
-    wireRows(container, query);
+    wireRows(container);
     wirePagination(container, query);
   } catch (error) {
     container.innerHTML = '<div class="state-block state-error">Erreur lors du chargement</div>';
@@ -76,53 +90,102 @@ async function load(context) {
 
 function rowHtml(suggestion) {
   const statusMeta = getStatusMeta(suggestion.status);
-  return `<tr data-row="${suggestion.id}">
-    <td>
-      <div class="cell-title-wrapper">
-        <a class="cell-title" href="${href(`${ROUTES.adminSuggestions}/${suggestion.id}`)}">${esc(suggestion.title)}</a>
-        <div class="cell-sub">${esc(suggestion.trackingCode ?? '')} · ${esc(suggestion.category)}</div>
-      </div>
-    </td>
-    <td>
-      <span class="category-tag">${categoryTagInfo(suggestion.category)}</span>
-    </td>
-    <td class="cell-date">${esc(formatDate(suggestion.createdAt))}</td>
-    <td class="cell-status">
-      <span class="badge tone-${statusMeta?.tone ?? 'neutral'}"><span class="dot"></span>${esc(suggestion.status)}</span>
-    </td>
-    <td>${formatNumber(suggestion.supportCount)}</td>
-    <td class="cell-actions">
-      <select class="status-select" data-status-for="${suggestion.id}" aria-label="Changer le statut">
-        ${SUGGESTION_STATUSES.map(
-          (s) => `<option value="${esc(s)}" ${s === suggestion.status ? 'selected' : ''}>${esc(s)}</option>`,
-        ).join('')}
-      </select>
-      <a class="btn btn-icon btn-ghost" href="${href(`${ROUTES.adminSuggestions}/${suggestion.id}`)}" aria-label="Ouvrir le détail">${icon('eye', { size: 16 })}</a>
-      <button class="btn btn-icon btn-ghost danger" type="button" data-delete="${suggestion.id}" data-title="${esc(suggestion.title)}" aria-label="Supprimer">${icon('trash', { size: 16 })}</button>
-    </td>
-  </tr>`;
+  const tone = statusMeta ? statusMeta.tone : 'neutral';
+  const statusValue = statusMeta ? statusMeta.value : suggestion.status;
+  const id = suggestion.id;
+  const title = suggestion.title || '';
+  const trackingCode = suggestion.trackingCode || '';
+  const category = suggestion.category || '';
+  const createdAt = suggestion.createdAt;
+  const supportCount = suggestion.supportCount || 0;
+  const hrefUrl = '/' + ROUTES.adminSuggestions + '/' + id;
+
+  const statusOptions = SUGGESTION_STATUSES.map(
+    (status) => '<option value="' + esc(status) + '" ' + (status === suggestion.status ? 'selected' : '') + '>' + esc(status) + '</option>',
+  ).join('');
+
+  const visibility = suggestion.visibility || 'privee';
+  const isPublic = visibility === 'publique';
+  const visibilityHtml =
+    '<button type="button" class="pill ' + (isPublic ? 'pill-public' : 'pill-private') + '" data-toggle-visibility="' + id + '" data-visibility="' + visibility + '" aria-label="' + (isPublic ? 'Retirer du public' : 'Publier') + '">' +
+    icon(isPublic ? 'eye' : 'eyeOff', { size: 14 }) + ' ' + (isPublic ? 'Publiée' : 'Non publiée') +
+    '</button>';
+
+  const actionsSelect = '<select class="status-select" data-status-for="' + id + '" aria-label="Changer le statut">' + statusOptions + '</select>';
+  const actionsView = '<a class="btn btn-icon btn-ghost" href="' + hrefUrl + '" aria-label="Ouvrir le détail">' + icon('eye', { size: 16 }) + '</a>';
+  const actionsDelete = '<button class="btn btn-icon btn-ghost danger" type="button" data-delete="' + id + '" data-title="' + esc(title) + '" aria-label="Supprimer">' + icon('trash', { size: 16 }) + '</button>';
+  const cellActions = '<td class="cell-actions">' + actionsSelect + visibilityHtml + actionsView + actionsDelete + '</td>';
+
+  return '<tr data-row="' + id + '">' +
+    '<td>' +
+    '<a class="cell-title" href="' + hrefUrl + '">' + esc(title) + '</a>' +
+    '<div class="cell-sub">' + esc(trackingCode) + ' · ' + esc(category) + '</div>' +
+    '</td>' +
+    '<td>' + esc(category) + '</td>' +
+    '<td class="cell-date">' + esc(formatDate(createdAt)) + '</td>' +
+    '<td class="cell-status"><span class="badge tone-' + tone + '"><span class="dot"></span>' + esc(statusValue) + '</span></td>' +
+    '<td>' + formatNumber(supportCount) + '</td>' +
+    cellActions +
+    '</tr>';
 }
 
 function categoryTagInfo(categoryValue) {
   const meta = CATEGORY_BY_VALUE[categoryValue];
   if (!meta) return categoryValue;
-  return `<span class="tag"><span class="dot"></span>${esc(meta.value)}</span>`;
+  return '<span class="tag"><span class="dot"></span>' + esc(meta.value) + '</span>';
 }
 
 function getStatusMeta(value) {
   return STATUS_BY_VALUE[value] ?? null;
 }
 
-function wireRows(container, query) {
+function wireFilters(main, query) {
+  const form = main.querySelector('#admin-filter-bar');
+  if (!form) return;
+
+  const searchInput = form.querySelector('[name="search"]');
+  const categoryInput = form.querySelector('[name="category"]');
+  const statusInput = form.querySelector('[name="status"]');
+  const visibilityInput = form.querySelector('[name="visibility"]');
+  const sortInput = form.querySelector('[name="sort"]');
+
+  if (searchInput) searchInput.value = query.search;
+  if (categoryInput) categoryInput.value = query.category;
+  if (statusInput) statusInput.value = query.status;
+  if (visibilityInput) visibilityInput.value = query.visibility;
+  if (sortInput) sortInput.value = query.sort;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    navigate(
+      buildHash({
+        page: 1,
+        search: String(data.get('search') ?? '').trim(),
+        category: String(data.get('category') ?? ''),
+        status: String(data.get('status') ?? ''),
+        visibility: String(data.get('visibility') ?? ''),
+        sort: String(data.get('sort') ?? 'recent'),
+      }),
+    );
+  });
+
+  form.querySelectorAll('select').forEach((select) => {
+    select.addEventListener('change', () => form.requestSubmit());
+  });
+}
+
+function wireRows(container) {
   container.querySelectorAll('[data-status-for]').forEach((select) => {
     select.addEventListener('change', async () => {
       const id = select.getAttribute('data-status-for');
       const status = select.value;
       select.disabled = true;
+
       try {
         const { data } = await adminApi.changeStatus(id, { status });
         updateRowStatus(container, id, data.suggestion);
-        toast(`Statut mis à jour : ${status}.`, 'success');
+        toast('Statut mis à jour : ' + status + '.', 'success');
       } catch (error) {
         handleAdminError(error);
       } finally {
@@ -137,8 +200,9 @@ function wireRows(container, query) {
       const current = button.getAttribute('data-visibility');
       const next = current === 'publique' ? 'privee' : 'publique';
       button.disabled = true;
+
       try {
-        const { data } = await adminApi.moderation(id, { visibility: next });
+        const { data } = await adminApi.moderate(id, { visibility: next });
         updateRowStatus(container, id, data.suggestion);
         toast(next === 'publique' ? 'Suggestion publiée.' : 'Suggestion retirée du public.', 'success');
       } catch (error) {
@@ -155,14 +219,17 @@ function wireRows(container, query) {
       const title = button.getAttribute('data-title');
       const ok = await confirmDialog({
         title: 'Supprimer la suggestion',
-        message: `Supprimer définitivement « ${title} » ? Cette action est irréversible.`,
+        message: 'Supprimer définitivement « ' + title + ' » ? Cette action est irréversible.',
         confirmLabel: 'Supprimer',
         danger: true,
       });
+
       if (!ok) return;
+
       try {
         await adminApi.remove(id);
-        container.querySelector(`[data-row="${id}"]`)?.remove();
+        const row = container.querySelector('[data-row="' + id + '"]');
+        if (row) row.remove();
         toast('Suggestion supprimée.', 'success');
       } catch (error) {
         handleAdminError(error);
@@ -172,17 +239,26 @@ function wireRows(container, query) {
 }
 
 function updateRowStatus(container, id, suggestion) {
-  const row = container.querySelector(`[data-row="${id}"]`);
+  const row = container.querySelector('[data-row="' + id + '"]');
   if (!row || !suggestion) return;
+
   const statusMeta = getStatusMeta(suggestion.status);
-  row.querySelector('.cell-status').innerHTML = `<span class="badge tone-${statusMeta?.tone ?? 'neutral'}"><span class="dot"></span>${esc(suggestion.statusInfo?.value ?? suggestion.status)}</span>`;
+  const tone = statusMeta ? statusMeta.tone : 'neutral';
+  const label = suggestion.statusInfo && suggestion.statusInfo.value ? suggestion.statusInfo.value : suggestion.status;
+
+  const statusEl = row.querySelector('.cell-status');
+  if (statusEl) {
+    statusEl.innerHTML = '<span class="badge tone-' + tone + '"><span class="dot"></span>' + esc(label) + '</span>';
+  }
+
   const toggle = row.querySelector('[data-toggle-visibility]');
   if (toggle) {
     const isPublic = suggestion.visibility === 'publique';
     toggle.setAttribute('data-visibility', suggestion.visibility);
-    toggle.className = `pill ${isPublic ? 'pill-public' : 'pill-private'}`;
-    toggle.innerHTML = `${icon(isPublic ? 'eye' : 'eyeOff', { size: 14 })} ${isPublic ? 'Publiée' : 'Non publiée'}`;
+    toggle.className = 'pill ' + (isPublic ? 'pill-public' : 'pill-private');
+    toggle.innerHTML = icon(isPublic ? 'eye' : 'eyeOff', { size: 14 }) + ' ' + (isPublic ? 'Publiée' : 'Non publiée');
   }
+
   const select = row.querySelector('[data-status-for]');
   if (select) select.value = suggestion.status;
 }
@@ -197,21 +273,27 @@ function wirePagination(container, query) {
 }
 
 function filtersHtml(query) {
-  const categoryOptions = CATEGORY_META.map((c) => `<option value="${esc(c.value)}">${esc(c.value)}</option>`).join('');
-  const statusOptions = SUGGESTION_STATUSES.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
-  const sortOptions = SORTS.map((s) => `<option value="${esc(s.value)}">${esc(s.label)}</option>`).join('');
+  const categoryOptions = CATEGORY_META.map(
+    (category) => '<option value="' + esc(category.value) + '">' + esc(category.value) + '</option>',
+  ).join('');
+  const statusOptions = SUGGESTION_STATUSES.map(
+    (status) => '<option value="' + esc(status) + '">' + esc(status) + '</option>',
+  ).join('');
+  const sortOptions = SORTS.map(
+    (sort) => '<option value="' + esc(sort.value) + '">' + esc(sort.label) + '</option>',
+  ).join('');
 
-  return `<form class="filter-bar container" id="admin-filter-bar">
-    <div class="field search-field">
-      <span class="search-icon">${icon('search', { size: 16 })}</span>
-      <input name="search" type="search" placeholder="Rechercher par titre…" maxlength="${LIMITS.titleMax}" value="${esc(query.search)}" />
-    </div>
-    <div class="field"><select name="category"><option value="">Toutes catégories</option>${categoryOptions}</select></div>
-    <div class="field"><select name="status"><option value="">Tous statuts</option>${statusOptions}</select></div>
-    <div class="field"><select name="visibility"><option value="">Toutes visibilités</option><option value="publique">Publiée</option><option value="privee">Non publiée</option></select></div>
-    <div class="field"><select name="sort">${sortOptions}</select></div>
-    <button class="btn btn-outline" type="submit">${icon('filter', { size: 16 })} Filtrer</button>
-  </form>`;
+  return '<form class="filter-bar container" id="admin-filter-bar">' +
+    '<div class="field search-field">' +
+    '<span class="search-icon">' + icon('search', { size: 16 }) + '</span>' +
+    '<input name="search" type="search" placeholder="Rechercher par titre…" maxlength="' + LIMITS.titleMax + '" value="' + esc(query.search) + '" />' +
+    '</div>' +
+    '<div class="field"><select name="category"><option value="">Toutes catégories</option>' + categoryOptions + '</select></div>' +
+    '<div class="field"><select name="status"><option value="">Tous statuts</option>' + statusOptions + '</select></div>' +
+    '<div class="field"><select name="visibility"><option value="">Toutes visibilités</option><option value="publique">Publiée</option><option value="privee">Non publiée</option></select></div>' +
+    '<div class="field"><select name="sort">' + sortOptions + '</select></div>' +
+    '<button class="btn btn-outline" type="submit">' + icon('filter', { size: 16 }) + ' Filtrer</button>' +
+    '</form>';
 }
 
 function normalizedQuery(raw = {}) {
@@ -221,7 +303,7 @@ function normalizedQuery(raw = {}) {
     status: raw.status ?? '',
     visibility: raw.visibility ?? '',
     search: raw.search ?? '',
-    sort: SORTS.some((s) => s.value === raw.sort) ? raw.sort : 'recent',
+    sort: SORTS.some((sort) => sort.value === raw.sort) ? raw.sort : 'recent',
   };
 }
 
@@ -233,6 +315,7 @@ function buildHash(query) {
   if (query.visibility) params.set('visibility', query.visibility);
   if (query.search) params.set('search', query.search);
   if (query.sort && query.sort !== 'recent') params.set('sort', query.sort);
+
   const search = params.toString();
-  return `${ROUTES.adminSuggestions}${search ? `?${search}` : ''}`;
+  return ROUTES.adminSuggestions + (search ? '?' + search : '');
 }

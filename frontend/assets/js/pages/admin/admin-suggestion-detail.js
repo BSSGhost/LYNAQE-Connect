@@ -175,7 +175,7 @@ function wireForms(main, suggestion) {
     const visibility = main.querySelector('#moderation-visibility').value;
     const moderationNote = main.querySelector('#moderation-note').value.trim();
     try {
-      await adminApi.moderation(suggestion.id, { visibility, moderationNote: moderationNote || undefined });
+      await adminApi.moderate(suggestion.id, { visibility, moderationNote: moderationNote || undefined });
       toast('Modération mise à jour.', 'success');
     } catch (error) {
       handleAdminError(error);

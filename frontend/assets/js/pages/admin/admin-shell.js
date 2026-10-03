@@ -52,7 +52,7 @@ function toggleSidebarState() {
   }
 }
 
-function sidebarHtml(active) {
+export function sidebarHtml(active) {
   const items = SIDEBAR_ITEMS.map(
     (item) =>
       `<a class="sidebar-link ${item.path === active ? 'is-active' : ''}" href="${href(item.path)}">
@@ -69,7 +69,7 @@ function sidebarHtml(active) {
       <nav class="admin-nav-sidebar">
         ${items}
       </nav>
-      <button class="admin-sidebar-toggle" aria-label="Ouvrir/fermer le menu" onclick="toggleSidebarState()">
+      <button class="admin-sidebar-toggle" id="admin-sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">
         ✕
       </button>
     </div>
@@ -98,6 +98,10 @@ function headerHtml(active) {
   `;
 }
 
+export function adminNavHtml(active) {
+  return headerHtml(active);
+}
+
 /* --- Construction de la barre de navigation admin ------------------------ */
 
 /**
@@ -110,6 +114,17 @@ export function wireAdminBar(onLogout) {
   }
 
   document.getElementById('admin-logout')?.addEventListener('click', onLogout);
+}
+
+export function handleAdminError(error) {
+  if (error?.status === 401) {
+    clearAdminToken();
+    toast('Ta session a expiré. Connecte-toi à nouveau.', 'warning');
+    navigate(ROUTES.admin, { replace: true });
+    return;
+  }
+
+  toast(error?.message || 'Une erreur inattendue est survenue.', 'error');
 }
 
 /* --- Fonctions d'enveloppe pour app.js ----------------------------------- */
@@ -130,35 +145,6 @@ export function adminPageWrapper(active) {
     <main class="admin-main" id="main" role="main">
       <!-- Page content injected by individual page render functions -->
     </main>
-  `;
-}
-
-/**
- * HTML de la seule sidebar (à utiliser quand la header existe déjà).
- * @param {string} active La route active
- * @returns {string} HTML de la sidebar
- */
-export function sidebarHtml(active) {
-  const items = SIDEBAR_ITEMS.map(
-    (item) =>
-      `<a class="sidebar-link ${item.path === active ? 'is-active' : ''}" href="${href(item.path)}">
-        ${icon(item.icon, { size: 20 })} <span>${esc(item.label)}</span>
-      </a>`,
-  ).join('');
-
-  return `
-    <div class="admin-sidebar" id="admin-sidebar" aria-label="Menu administration">
-      <div class="admin-sidebar-brand">
-        <div class="logo">${icon('logo', { size: 24 })}</div>
-        <span>LYNAQE<br><span class="brand-sub">CONNECT</span></span>
-      </div>
-      <nav class="admin-nav-sidebar">
-        ${items}
-      </nav>
-      <button class="admin-sidebar-toggle" aria-label="Ouvrir/fermer le menu" onclick="toggleSidebarState()">
-        ✕
-      </button>
-    </div>
   `;
 }
 

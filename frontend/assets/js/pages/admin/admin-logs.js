@@ -59,7 +59,7 @@ async function load(context) {
             <thead><tr><th>Action</th><th>Suggestion</th><th>Nouveau statut</th><th>Acteur</th><th>Date</th></tr></thead>
             <tbody>${data.map(moderationLogHtml).join('')}</tbody>
           </table></div>
-          ${paginationHtml(meta)}
+          ${paginationHtml(meta)}`
       : `<div class="state-block state-empty">${icon('journal', { size: 36 })}<h2>Aucune entrée</h2><p>Le journal est vide pour ces critères.</p></div>`;
 
     wirePagination(container, query);

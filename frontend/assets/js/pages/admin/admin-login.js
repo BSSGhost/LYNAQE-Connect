@@ -8,6 +8,7 @@ import { mount } from '../../core/dom.js';
 import { href, navigate } from '../../core/router.js';
 import { icon } from '../../core/icons.js';
 import { adminApi } from '../../core/api.js';
+import { isAdmin, setAdminToken } from '../../core/store.js';
 import { toast } from '../../core/ui.js';
 
 export async function render() {
