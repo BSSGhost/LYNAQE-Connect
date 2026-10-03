@@ -1362,6 +1362,150 @@
   margin: var(--space-3) 0 var(--space-2);
 }
 
+.admin-actions-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(18, 59, 109, 0.04);
+}
+
+.admin-actions-panel > h2 {
+  margin-bottom: var(--space-3);
+  font-size: 1.25rem;
+}
+
+.admin-action-row {
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-action-summary,
+.admin-action-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.admin-action-label {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.admin-action-current {
+  justify-content: flex-end;
+}
+
+.admin-action-edit {
+  border: 0;
+  padding: 0.35rem 0.25rem;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.admin-action-edit:hover {
+  color: var(--accent-strong);
+}
+
+.admin-action-edit:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-action-editor[hidden] {
+  display: none;
+}
+
+.admin-action-editor {
+  max-width: 420px;
+  margin: var(--space-3) 0 0 auto;
+}
+
+.admin-action-editor .field {
+  margin: 0;
+}
+
+.admin-action-editor select,
+.admin-action-field textarea {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.admin-action-field {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.admin-action-field label {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.admin-action-field textarea {
+  min-height: 68px;
+  padding: 0.65rem 0.8rem;
+  resize: vertical;
+}
+
+.admin-action-field textarea:focus,
+.admin-action-editor select:focus {
+  border-color: var(--accent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.admin-action-field textarea::placeholder {
+  color: var(--text-soft);
+  opacity: 0.8;
+}
+
+.admin-actions-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.admin-actions-footer .btn {
+  width: auto;
+}
+
+.admin-delete-action {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 520px) {
+  .admin-action-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .admin-action-current {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-actions-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-actions-footer .btn {
+    width: 100%;
+  }
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

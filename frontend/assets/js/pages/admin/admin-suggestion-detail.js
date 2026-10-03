@@ -55,6 +55,12 @@ function detailHtml(data) {
   const statusOptions = SUGGESTION_STATUSES.map(
     (status) => `<option value="${esc(status)}" ${status === s.status ? 'selected' : ''}>${esc(status)}</option>`,
   ).join('');
+  const visibilityOptions = [
+    { value: 'privee', label: 'Non publiée' },
+    { value: 'publique', label: 'Publiée' },
+  ].map(
+    (visibility) => `<option value="${visibility.value}" ${visibility.value === s.visibility ? 'selected' : ''}>${visibility.label}</option>`,
+  ).join('');
   const location = s.location
     ? `<div class="detail-block"><h2>${icon('mapPin', { size: 18 })} Lieu concerné</h2><p>${esc(s.location)}</p></div>`
     : '';
@@ -88,6 +94,52 @@ function detailHtml(data) {
         ${location}
         ${extraInfo}
 
+        <section class="panel admin-actions-panel">
+          <h2>${icon('shieldCheck', { size: 18 })} Actions administratives</h2>
+
+          <div class="admin-action-row">
+            <div class="admin-action-summary">
+              <span class="admin-action-label">Statut</span>
+              <div class="admin-action-current">
+                <span class="badge tone-${esc(s.statusInfo?.tone ?? 'neutral')}" data-current-status><span class="dot"></span>${esc(s.statusInfo?.value ?? s.status)}</span>
+                <button class="admin-action-edit" type="button" data-edit-toggle="status" aria-controls="status-editor" aria-expanded="false">Modifier <span aria-hidden="true">→</span></button>
+              </div>
+            </div>
+            <div class="admin-action-editor" id="status-editor" hidden>
+              <div class="field"><label for="status-select">Nouveau statut</label><select id="status-select">${statusOptions}</select></div>
+              <div class="field checkbox"><input id="status-publish" type="checkbox" ${s.visibility === 'publique' ? 'checked' : ''} /><label for="status-publish">Publier avec le changement de statut</label></div>
+            </div>
+          </div>
+
+          <div class="admin-action-row">
+            <div class="admin-action-summary">
+              <span class="admin-action-label">Publication</span>
+              <div class="admin-action-current">
+                <span class="pill ${s.visibility === 'publique' ? 'pill-public' : 'pill-private'}" data-current-visibility>${s.visibility === 'publique' ? 'Publiée' : 'Non publiée'}</span>
+                <button class="admin-action-edit" type="button" data-edit-toggle="visibility" aria-controls="visibility-editor" aria-expanded="false">Modifier <span aria-hidden="true">→</span></button>
+              </div>
+            </div>
+            <div class="admin-action-editor" id="visibility-editor" hidden>
+              <div class="field"><label for="moderation-visibility">Visibilité</label><select id="moderation-visibility">${visibilityOptions}</select></div>
+            </div>
+          </div>
+
+          <div class="admin-action-field">
+            <label for="status-message">Message public</label>
+            <textarea id="status-message" rows="2" maxlength="${LIMITS.adminMessageMax}" placeholder="Ajouter un message destiné à l'auteur…"></textarea>
+          </div>
+          <div class="admin-action-field">
+            <label for="moderation-note">Note interne</label>
+            <textarea id="moderation-note" rows="2" maxlength="${LIMITS.moderationNoteMax}" placeholder="Ajouter une note pour l'administration…">${esc(s.moderationNote ?? '')}</textarea>
+          </div>
+
+          <div class="admin-actions-footer">
+            <button class="btn btn-outline btn-sm" type="button" id="apply-status">${icon('check', { size: 16 })} Enregistrer le statut</button>
+            <button class="btn btn-outline btn-sm" type="button" id="apply-moderation">${icon('shieldCheck', { size: 16 })} Enregistrer la modération</button>
+          </div>
+          <button class="btn btn-outline btn-sm danger admin-delete-action" type="button" data-action="delete" data-title="${esc(s.title)}">${icon('trash', { size: 16 })} Supprimer la suggestion</button>
+        </section>
+
         <section class="panel">
           <h2>${icon('history', { size: 18 })} Historique du suivi (visible par l'auteur)</h2>
           ${timelineHtml(data.timeline)}
@@ -108,33 +160,23 @@ function detailHtml(data) {
           ${progressStepsHtml(s.status)}
           <p class="field-hint">${esc(s.statusInfo?.description ?? '')}</p>
         </section>
-
-        <section class="panel">
-          <h2>${icon('refresh', { size: 18 })} Changer le statut</h2>
-          <div class="field"><label for="status-select">Nouveau statut</label><select id="status-select">${statusOptions}</select></div>
-          <div class="field"><label for="status-message">Message public (facultatif)</label><textarea id="status-message" rows="3" maxlength="${LIMITS.adminMessageMax}" placeholder="Affiché dans le suivi de l'auteur"></textarea></div>
-          <div class="field checkbox"><input id="status-publish" type="checkbox" ${s.visibility === 'publique' ? 'checked' : ''} /><label for="status-publish">Publier cette suggestion</label></div>
-          <button class="btn btn-primary btn-block" type="button" id="apply-status">${icon('check', { size: 16 })} Appliquer le statut</button>
-        </section>
-
-        <section class="panel">
-          <h2>${icon('shieldCheck', { size: 18 })} Modération</h2>
-          <div class="field"><label for="moderation-visibility">Visibilité</label>
-            <select id="moderation-visibility">
-              <option value="privee" ${s.visibility === 'privee' ? 'selected' : ''}>Non publiée</option>
-              <option value="publique" ${s.visibility === 'publique' ? 'selected' : ''}>Publiée</option>
-            </select>
-          </div>
-          <div class="field"><label for="moderation-note">Note interne</label><textarea id="moderation-note" rows="3" maxlength="${LIMITS.moderationNoteMax}">${esc(s.moderationNote ?? '')}</textarea></div>
-          <button class="btn btn-outline btn-block" type="button" id="apply-moderation">${icon('shieldCheck', { size: 16 })} Appliquer</button>
-          <button class="btn btn-outline btn-block danger" type="button" data-action="delete" data-title="${esc(s.title)}">${icon('trash', { size: 16 })} Supprimer la suggestion</button>
-        </section>
       </aside>
     </div>
   </div>`;
 }
 
 function wireActions(main, suggestion) {
+  main.querySelectorAll('[data-edit-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const editor = main.querySelector(`#${button.getAttribute('aria-controls')}`);
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      editor.hidden = expanded;
+      button.setAttribute('aria-expanded', String(!expanded));
+      button.querySelector('span').textContent = expanded ? '→' : '↑';
+      button.firstChild.textContent = expanded ? 'Modifier ' : 'Fermer ';
+    });
+  });
+
   main.querySelector('#apply-status').addEventListener('click', async () => {
     const status = main.querySelector('#status-select').value;
     const message = main.querySelector('#status-message').value.trim();
