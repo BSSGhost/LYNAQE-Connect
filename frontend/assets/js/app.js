@@ -63,10 +63,11 @@ function bootstrap() {
     .notFound(notFound.render);
 
   const afterNav = () => {
-    setActiveNav(currentPath());
+    const path = currentPath();
+    setActiveNav(path);
     // Mettre à jour la classe admin pour afficher/cacher la sidebar
     const html = document.documentElement;
-    if (isAdminRoute(currentPath())) {
+    if (isAdminRoute(path) && path !== ROUTES.admin) {
       html.setAttribute('data-admin', '');
     } else {
       html.removeAttribute('data-admin');

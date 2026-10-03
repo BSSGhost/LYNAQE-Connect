@@ -137,26 +137,37 @@ ol {
   width: 100%;
 }
 
-/* Administration : sidebar fixe et header collant */
-[data-admin] {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: var(--space-6);
+/* Administration : la sidebar et l'entête admin remplacent l'habillage public. */
+html[data-admin] body {
+  display: block;
   min-height: 100vh;
 }
 
-[data-admin] .admin-sidebar {
-  position: sticky;
-  top: 0;
-  align-self: start;
-  height: fit-content;
-  border-right: 1px solid var(--border);
-  z-index: 99;
+html[data-admin] #site-header,
+html[data-admin] #site-footer {
+  display: none;
 }
 
-[data-admin] .admin-header {
-  position: sticky;
-  top: 260px;
+html[data-admin] .site-main {
+  width: calc(100% - 260px);
+  min-height: 100vh;
+  margin-left: 260px;
+  padding: 88px var(--space-6) var(--space-6);
+}
+
+html[data-admin] .admin-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  height: 100vh;
+  z-index: 100;
+}
+
+html[data-admin] .admin-header {
+  position: fixed;
+  top: 0;
   left: 260px;
   right: 0;
   z-index: 90;
@@ -164,46 +175,61 @@ ol {
   border-bottom: 1px solid var(--border);
 }
 
-[data-admin] .admin-main {
-  margin-left: 260px;
-  padding: var(--space-6);
-  margin-top: 64px;
+html[data-admin] .admin-header-toggle {
+  display: none;
 }
 
-[data-admin] .admin-main.collapsed {
+html[data-admin][data-sidebar="collapsed"] .admin-sidebar {
+  transform: translateX(-100%);
+}
+
+html[data-admin][data-sidebar="collapsed"] .site-main {
+  width: 100%;
   margin-left: 0;
 }
 
+html[data-admin][data-sidebar="collapsed"] .admin-header {
+  left: 0;
+}
+
 @media (max-width: 900px) {
-  [data-admin] {
-    grid-template-columns: 1fr;
+  html[data-admin] .site-main {
+    width: 100%;
+    margin-left: 0;
+    padding: 80px var(--space-4) var(--space-4);
   }
 
-  [data-admin] .admin-sidebar {
+  html[data-admin] .admin-sidebar {
     position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
     transform: translateX(-100%);
     z-index: 100;
   }
 
-  [data-admin] .admin-sidebar.open {
+  html[data-admin][data-sidebar="expanded"] .admin-sidebar {
     transform: translateX(0);
   }
 
-  [data-admin] .admin-header {
+  html[data-admin] .admin-header {
     position: fixed;
-    left: 260px;
+    left: 0;
     top: 0;
     z-index: 80;
   }
 
-  [data-admin] .admin-main {
-    margin-left: 0;
-    margin-top: 64px;
-    padding: var(--space-4);
+  html[data-admin] .admin-header-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-right: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
   }
+
 }
 
 .container {
@@ -216,7 +242,7 @@ ol {
    Les éléments volontairement pleine largeur sont exclus (héros, barre
    d'administration) ainsi que les conteneurs déjà dimensionnés. */
 .site-main
-  > *:not(.hero):not(.admin-bar):not(.container):not(.container-narrow) {
+  > *:not(.hero):not(.admin-bar):not(.admin-sidebar):not(.admin-header):not(.container):not(.container-narrow) {
   width: min(100% - 2rem, var(--container));
   margin-inline: auto;
 }

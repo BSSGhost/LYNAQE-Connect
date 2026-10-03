@@ -43,10 +43,13 @@ export function guardAdmin() {
  */
 function toggleSidebarState() {
   const html = document.documentElement;
-  const current = html.getAttribute('data-sidebar') === 'collapsed';
-  html.setAttribute('data-sidebar', current ? 'expanded' : 'collapsed');
+  const current =
+    html.getAttribute('data-sidebar') ||
+    (window.matchMedia('(max-width: 900px)').matches ? 'collapsed' : 'expanded');
+  const next = current === 'collapsed' ? 'expanded' : 'collapsed';
+  html.setAttribute('data-sidebar', next);
   try {
-    sessionStorage.setItem('sidebarState', current ? 'expanded' : 'collapsed');
+    sessionStorage.setItem('sidebarState', next);
   } catch (e) {
     /* mode navigation privée : on ignore */
   }
@@ -87,6 +90,9 @@ function headerHtml(active) {
   return `
     <header class="admin-header" id="admin-header">
       <div class="admin-header-left">
+        <button class="admin-header-toggle" id="admin-header-toggle" type="button" aria-label="Ouvrir le menu">
+          ${icon('menu', { size: 20 })}
+        </button>
         <div class="admin-brand">
           ${icon('logo', { size: 20 })} <span>LYNAQE CONNECT</span>
         </div>
@@ -109,9 +115,8 @@ export function adminNavHtml(active) {
  */
 export function wireAdminBar(onLogout) {
   const sidebarToggle = document.getElementById('admin-sidebar-toggle');
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener('click', toggleSidebarState);
-  }
+  sidebarToggle?.addEventListener('click', toggleSidebarState);
+  document.getElementById('admin-header-toggle')?.addEventListener('click', toggleSidebarState);
 
   document.getElementById('admin-logout')?.addEventListener('click', onLogout);
 }
