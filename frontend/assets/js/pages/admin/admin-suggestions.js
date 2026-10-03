@@ -98,7 +98,7 @@ function rowHtml(suggestion) {
   const category = suggestion.category || '';
   const createdAt = suggestion.createdAt;
   const supportCount = suggestion.supportCount || 0;
-  const hrefUrl = '/' + ROUTES.adminSuggestions + '/' + id;
+  const hrefUrl = href(ROUTES.adminSuggestions + '/' + id);
 
   const statusOptions = SUGGESTION_STATUSES.map(
     (status) => '<option value="' + esc(status) + '" ' + (status === suggestion.status ? 'selected' : '') + '>' + esc(status) + '</option>',

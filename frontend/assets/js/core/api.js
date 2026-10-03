@@ -98,6 +98,7 @@ export const suggestionsApi = {
   detail: (id) => api.get(`/suggestions/${id}`),
   create: (payload) => api.post('/suggestions', payload),
   support: (id) => api.post(`/suggestions/${id}/support`),
+  unsupport: (id) => api.delete(`/suggestions/${id}/support`),
 };
 
 export const trackingApi = {

@@ -41,15 +41,34 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(150deg, var(--primary), var(--accent));
-  color: #fff;
-  box-shadow: var(--shadow-sm);
+  background: url('/assets/img/logo.png') center / contain no-repeat;
+  color: transparent;
+  box-shadow: none;
   flex: none;
 }
 
 .brand-mark svg {
-  width: 24px;
-  height: 24px;
+  display: none;
+}
+
+.admin-brand::before {
+  content: '';
+  width: 34px;
+  height: 34px;
+  flex: none;
+  background: url('/assets/img/logo.png') center / contain no-repeat;
+}
+
+.admin-brand > svg {
+  display: none;
+}
+
+.logo {
+  background: url('/assets/img/logo.png') center / contain no-repeat;
+}
+
+.logo > svg {
+  display: none;
 }
 
 .brand-text {
@@ -105,9 +124,9 @@
   white-space: nowrap;
 }
 
-/* Entre 1080 et 1240 px : le bandeau se resserre pour que la marque, la
+/* Entre 1080 et 1360 px : le bandeau se resserre pour que la marque, la
    navigation et le bouton principal tiennent sans jamais se couper. */
-@media (max-width: 1240px) {
+@media (max-width: 1360px) {
   .header-inner {
     gap: var(--space-2);
   }

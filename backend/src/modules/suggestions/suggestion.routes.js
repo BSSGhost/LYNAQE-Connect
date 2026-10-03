@@ -5,6 +5,7 @@
  *   GET    /api/suggestions                    lister les suggestions publiees
  *   GET    /api/suggestions/:id                detail d'une suggestion publiee
  *   POST   /api/suggestions/:id/support        soutenir une suggestion
+ *   DELETE /api/suggestions/:id/support        retirer son soutien
  */
 
 import { Router } from 'express';
@@ -70,6 +71,16 @@ suggestionRouter.post(
   supportLimiter,
   asyncHandler(async (req, res) => {
     const result = await service.supportSuggestion(req.resourceId, req);
+    return ok(res, result);
+  }),
+);
+
+/** Retrait du soutien de l'appareil courant. */
+suggestionRouter.delete(
+  '/:id/support',
+  supportLimiter,
+  asyncHandler(async (req, res) => {
+    const result = await service.unsupportSuggestion(req.resourceId, req);
     return ok(res, result);
   }),
 );

@@ -29,6 +29,7 @@ import {
   listPublicSuggestions,
   findPublicSuggestionById,
   addSupportOnce,
+  removeSupportOnce,
   insertModerationLog,
 } from './suggestion.repository.js';
 import { toOwnerSuggestion, toPublicSuggestion, toSuggestionUpdate } from './suggestion.serializer.js';
@@ -167,6 +168,42 @@ export async function supportSuggestion(id, req) {
         action: 'modification',
         actor: 'system',
         note: 'Soutien enregistre.',
+        ipMasked: req.clientIpMasked,
+        userAgent: req.userAgent,
+      });
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Retire le soutien de l'appareil courant.
+ *
+ * @param {number|string} id identifiant public de la suggestion
+ * @param {object} req requete Express (IP, agent utilisateur, jeton d'appareil)
+ * @returns {Promise<{removed: boolean, supportCount: number}>}
+ */
+export async function unsupportSuggestion(id, req) {
+  const row = await findPublicSuggestionById(id);
+  if (!row) {
+    throw notFound('Cette suggestion n’est pas disponible.');
+  }
+
+  const supporterHash = computeSupporterHash({
+    supporterToken: req.supporterToken,
+    ipMasked: req.clientIpMasked,
+    userAgent: req.userAgent,
+  });
+  const result = await removeSupportOnce({ suggestionId: row.id, supporterHash });
+
+  if (result.removed) {
+    await transaction(async (connection) => {
+      await insertModerationLog(connection, {
+        suggestionId: row.id,
+        action: 'modification',
+        actor: 'system',
+        note: 'Soutien retire.',
         ipMasked: req.clientIpMasked,
         userAgent: req.userAgent,
       });

@@ -13,6 +13,7 @@ const LINKS = [
   { path: ROUTES.suggestions, label: 'Suggestions' },
   { path: ROUTES.howItWorks, label: 'Comment ça marche' },
   { path: ROUTES.about, label: 'À propos' },
+  { path: ROUTES.admin, label: 'Espace administration' },
 ];
 
 export function renderHeader() {

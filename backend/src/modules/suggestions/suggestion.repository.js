@@ -166,6 +166,29 @@ export async function addSupportOnce({ suggestionId, supporterHash, supporterTok
   });
 }
 
+/** Retire un soutien de l'appareil et met a jour le compteur atomiquement. */
+export async function removeSupportOnce({ suggestionId, supporterHash }) {
+  return transaction(async (connection) => {
+    const [result] = await connection.execute(
+      'DELETE FROM supports WHERE suggestion_id = ? AND supporter_hash = ?',
+      [suggestionId, supporterHash],
+    );
+
+    if (result.affectedRows > 0) {
+      await connection.execute(
+        'UPDATE suggestions SET support_count = GREATEST(support_count - 1, 0) WHERE id = ?',
+        [suggestionId],
+      );
+    }
+
+    const [rows] = await connection.execute(
+      'SELECT support_count FROM suggestions WHERE id = ?',
+      [suggestionId],
+    );
+    return { removed: result.affectedRows > 0, supportCount: Number(rows[0].support_count) };
+  });
+}
+
 /** Retire tous les soutiens d'une suggestion (repli apres suppression). */
 export async function deleteSupportsForSuggestion(suggestionId) {
   return execute('DELETE FROM supports WHERE suggestion_id = ?', [suggestionId]);

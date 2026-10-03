@@ -498,6 +498,35 @@ test('POST /api/suggestions/:id/support enregistre un soutien unique', async () 
   assert.equal(Number(rows[0].distinct_hashes), 2);
 });
 
+test('DELETE /api/suggestions/:id/support retire uniquement le soutien de cet appareil', async () => {
+  const list = await api('/api/suggestions');
+  const id = list.body.data[0].id;
+  const headers = { 'X-Supporter-Token': 'appareil-eleve-1' };
+
+  const removed = await api(`/api/suggestions/${id}/support`, {
+    method: 'DELETE',
+    headers,
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.data.removed, true);
+  assert.equal(removed.body.data.supportCount, 1);
+
+  const removedAgain = await api(`/api/suggestions/${id}/support`, {
+    method: 'DELETE',
+    headers,
+  });
+  assert.equal(removedAgain.status, 200);
+  assert.equal(removedAgain.body.data.removed, false);
+  assert.equal(removedAgain.body.data.supportCount, 1);
+
+  const restored = await api(`/api/suggestions/${id}/support`, {
+    method: 'POST',
+    headers,
+  });
+  assert.equal(restored.status, 200);
+  assert.equal(restored.body.data.supportCount, 2);
+});
+
 test('soutenir une suggestion non publiee renvoie 404', async () => {
   const list = await api('/api/admin/suggestions', { token: adminToken });
   const target = list.body.data.find((item) => item.title === 'Ajouter un point d’eau');
