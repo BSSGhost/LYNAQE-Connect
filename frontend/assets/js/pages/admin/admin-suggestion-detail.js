@@ -45,7 +45,7 @@ export async function render(context) {
       main,
       `${sidebarHtml(ROUTES.adminSuggestions)}${adminNavHtml(ROUTES.adminSuggestions)}
       <div class="state-block state-error" role="alert">${icon('alert', { size: 32 })}<h2>Erreur</h2><p>${esc(error.message)}</p>
-      <a class="btn btn-outline" href="${href(ROUTES.adminSuggestions)}">${icon('chevronLeft', { size: 16 })} Retour à la liste}</a></div>`,
+      <a class="btn btn-outline" href="${href(ROUTES.adminSuggestions)}">${icon('chevronLeft', { size: 16 })} Retour à la liste</a></div>`,
     );
     wireAdminBar(() => logoutAdmin());
   }
@@ -133,6 +133,7 @@ function detailHtml(data) {
           </div>
           <div class="field"><label for="moderation-note">Note interne</label><textarea id="moderation-note" rows="3" maxlength="${LIMITS.moderationNoteMax}">${esc(s.moderationNote ?? '')}</textarea></div>
           <button class="btn btn-outline btn-block" type="button" id="apply-moderation">${icon('shieldCheck', { size: 16 })} Appliquer</button>
+          <button class="btn btn-outline btn-block danger" type="button" data-action="delete" data-title="${esc(s.title)}">${icon('trash', { size: 16 })} Supprimer la suggestion</button>
         </section>
       </aside>
     </div>

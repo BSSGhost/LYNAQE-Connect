@@ -10,7 +10,7 @@
 import { ROUTES } from '../../../../../shared/constants.js';
 import { href, navigate } from '../../core/router.js';
 import { icon } from '../../core/icons.js';
-import { isAdmin, clearAdminToken } from '../../core/store.js';
+import { isAdmin, clearAdminToken, getTheme, toggleTheme, applyTheme } from '../../core/store.js';
 import { toast } from '../../core/ui.js';
 import { esc } from '../../core/dom.js';
 
@@ -18,10 +18,6 @@ const SIDEBAR_ITEMS = [
   { path: ROUTES.adminSuggestions, label: 'Suggestions', icon: 'list' },
   { path: ROUTES.adminStatistics, label: 'Statistiques', icon: 'chart' },
   { path: ROUTES.adminLogs, label: 'Journal', icon: 'journal' },
-];
-
-const NAV_ITEMS = [
-  { path: ROUTES.home, label: 'Accueil', icon: 'home' },
 ];
 
 /**
@@ -67,11 +63,13 @@ export function sidebarHtml(active) {
     <div class="admin-sidebar" id="admin-sidebar" aria-label="Menu administration">
       <div class="admin-sidebar-brand">
         <div class="logo">${icon('logo', { size: 24 })}</div>
-        <span>LYNAQE<br><span class="brand-sub">CONNECT</span></span>
+        <span class="admin-brand-name">LYNAQE<br><span class="brand-sub">CONNECT</span><small>LYNAQE de Sédhiou</small></span>
       </div>
+      <p class="admin-nav-caption">Navigation</p>
       <nav class="admin-nav-sidebar">
         ${items}
       </nav>
+      <p class="admin-sidebar-note">Une idée peut changer le lycée.</p>
       <button class="admin-sidebar-toggle" id="admin-sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">
         ✕
       </button>
@@ -79,33 +77,29 @@ export function sidebarHtml(active) {
   `;
 }
 
-function headerHtml(active) {
-  const items = NAV_ITEMS.map(
-    (item) =>
-      `<a class="header-nav-link ${item.path === active ? 'is-active' : ''}" href="${href(item.path)}">
-        ${icon(item.icon, { size: 18 })} ${esc(item.label)}
-      </a>`,
-  ).join('');
-
+function headerHtml() {
   return `
     <header class="admin-header" id="admin-header">
       <div class="admin-header-left">
         <button class="admin-header-toggle" id="admin-header-toggle" type="button" aria-label="Ouvrir le menu">
           ${icon('menu', { size: 20 })}
         </button>
-        <div class="admin-brand">
-          ${icon('logo', { size: 20 })} <span>LYNAQE CONNECT</span>
-        </div>
+        <div class="admin-header-context"><span>Administration</span><small>LYNAQE Connect</small></div>
       </div>
-      <nav class="admin-header-nav">
-        ${items}
-      </nav>
+      <div class="admin-header-actions">
+        <button class="admin-theme-toggle" id="admin-theme-toggle" type="button" aria-label="Changer de thème">
+          ${icon('sun', { size: 18, className: 'admin-theme-sun' })}
+          ${icon('moon', { size: 18, className: 'admin-theme-moon' })}
+        </button>
+        <a class="admin-public-link" href="${href(ROUTES.home)}">${icon('external', { size: 16 })}<span>Voir le site</span></a>
+        <button class="admin-logout-button" id="admin-logout" type="button">${icon('logout', { size: 16 })}<span>Déconnexion</span></button>
+      </div>
     </header>
   `;
 }
 
-export function adminNavHtml(active) {
-  return headerHtml(active);
+export function adminNavHtml() {
+  return headerHtml();
 }
 
 /* --- Construction de la barre de navigation admin ------------------------ */
@@ -119,6 +113,20 @@ export function wireAdminBar(onLogout) {
   document.getElementById('admin-header-toggle')?.addEventListener('click', toggleSidebarState);
 
   document.getElementById('admin-logout')?.addEventListener('click', onLogout);
+  const themeToggle = document.getElementById('admin-theme-toggle');
+  if (themeToggle) {
+    themeToggle.setAttribute(
+      'aria-label',
+      getTheme() === 'dark' ? 'Activer le thème clair' : 'Activer le thème sombre',
+    );
+    themeToggle.addEventListener('click', () => {
+      applyTheme(toggleTheme());
+      themeToggle.setAttribute(
+        'aria-label',
+        getTheme() === 'dark' ? 'Activer le thème clair' : 'Activer le thème sombre',
+      );
+    });
+  }
 }
 
 export function handleAdminError(error) {

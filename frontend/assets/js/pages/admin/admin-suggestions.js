@@ -17,7 +17,7 @@ import { icon } from '../../core/icons.js';
 import { adminApi } from '../../core/api.js';
 import { formatDate, formatNumber } from '../../core/format.js';
 import { toast, confirmDialog } from '../../core/ui.js';
-import { loadingHtml, emptyStateHtml } from '../../components/layout.js';
+import { emptyStateHtml } from '../../components/layout.js';
 import { paginationHtml } from '../../components/pagination.js';
 import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
@@ -40,9 +40,14 @@ export async function render(context) {
     main,
     sidebarHtml(ROUTES.adminSuggestions)
       + adminNavHtml(ROUTES.adminSuggestions)
+      + '<header class="admin-page-heading"><p class="admin-page-eyebrow">LYNAQE de Sédhiou</p><h1>Suggestions</h1><p>Gérez, examinez et mettez à jour les propositions des élèves.</p></header>'
       + filtersHtml(query)
-      + loadingHtml()
-      + '<div id="admin-results"></div>',
+      + '<section class="admin-results-panel" aria-label="Liste des suggestions">'
+      + '<div class="admin-skeleton" id="admin-loading" role="status" aria-label="Chargement des suggestions">'
+      + '<span></span><span></span><span></span><span></span>'
+      + '</div>'
+      + '<div id="admin-results"></div>'
+      + '</section>',
   );
 
   wireAdminBar(() => logoutAdmin());
@@ -52,6 +57,7 @@ export async function render(context) {
 
 async function load(context) {
   const container = document.getElementById('admin-results');
+  const loading = document.getElementById('admin-loading');
   const query = normalizedQuery(context.query);
 
   try {
@@ -65,6 +71,7 @@ async function load(context) {
       sort: query.sort || undefined,
     });
 
+    loading?.remove();
     if (data.length) {
       container.innerHTML =
         '<p class="result-count">' + formatNumber(meta.total) + ' suggestion' + (meta.total > 1 ? 's' : '') + '</p>' +
@@ -84,7 +91,9 @@ async function load(context) {
     wireRows(container);
     wirePagination(container, query);
   } catch (error) {
-    container.innerHTML = '<div class="state-block state-error">Erreur lors du chargement</div>';
+    handleAdminError(error);
+    loading?.remove();
+    container.innerHTML = '<div class="state-block state-error" role="alert"><h2>Erreur lors du chargement</h2><p>' + esc(error.message) + '</p></div>';
   }
 }
 
@@ -106,15 +115,12 @@ function rowHtml(suggestion) {
 
   const visibility = suggestion.visibility || 'privee';
   const isPublic = visibility === 'publique';
-  const visibilityHtml =
-    '<button type="button" class="pill ' + (isPublic ? 'pill-public' : 'pill-private') + '" data-toggle-visibility="' + id + '" data-visibility="' + visibility + '" aria-label="' + (isPublic ? 'Retirer du public' : 'Publier') + '">' +
-    icon(isPublic ? 'eye' : 'eyeOff', { size: 14 }) + ' ' + (isPublic ? 'Publiée' : 'Non publiée') +
-    '</button>';
 
-  const actionsSelect = '<select class="status-select" data-status-for="' + id + '" aria-label="Changer le statut">' + statusOptions + '</select>';
-  const actionsView = '<a class="btn btn-icon btn-ghost" href="' + hrefUrl + '" aria-label="Ouvrir le détail">' + icon('eye', { size: 16 }) + '</a>';
-  const actionsDelete = '<button class="btn btn-icon btn-ghost danger" type="button" data-delete="' + id + '" data-title="' + esc(title) + '" aria-label="Supprimer">' + icon('trash', { size: 16 }) + '</button>';
-  const cellActions = '<td class="cell-actions">' + actionsSelect + visibilityHtml + actionsView + actionsDelete + '</td>';
+  const actionsSelect = '<label class="admin-menu-field">Changer le statut<select class="status-select" data-status-for="' + id + '" aria-label="Changer le statut">' + statusOptions + '</select></label>';
+  const actionsView = '<a href="' + hrefUrl + '">' + icon('eye', { size: 16 }) + '<span>Voir la suggestion</span></a>';
+  const actionsDelete = '<button type="button" data-delete="' + id + '" data-title="' + esc(title) + '">' + icon('trash', { size: 16 }) + '<span>Supprimer</span></button>';
+  const visibilityAction = '<button type="button" class="admin-menu-visibility" data-toggle-visibility="' + id + '" data-visibility="' + visibility + '" aria-label="' + (isPublic ? 'Dépublier cette suggestion' : 'Publier cette suggestion') + '">' + icon(isPublic ? 'eyeOff' : 'eye', { size: 16 }) + '<span>' + (isPublic ? 'Dépublier' : 'Publier') + '</span></button>';
+  const cellActions = '<td class="cell-actions"><details class="admin-row-menu"><summary aria-label="Actions pour ' + esc(title) + '">' + icon('dots', { size: 19 }) + '</summary><div class="admin-row-menu-panel">' + actionsView + actionsSelect + visibilityAction + actionsDelete + '</div></details></td>';
 
   return '<tr data-row="' + id + '">' +
     '<td>' +
@@ -255,8 +261,8 @@ function updateRowStatus(container, id, suggestion) {
   if (toggle) {
     const isPublic = suggestion.visibility === 'publique';
     toggle.setAttribute('data-visibility', suggestion.visibility);
-    toggle.className = 'pill ' + (isPublic ? 'pill-public' : 'pill-private');
-    toggle.innerHTML = icon(isPublic ? 'eye' : 'eyeOff', { size: 14 }) + ' ' + (isPublic ? 'Publiée' : 'Non publiée');
+    toggle.setAttribute('aria-label', isPublic ? 'Dépublier cette suggestion' : 'Publier cette suggestion');
+    toggle.innerHTML = icon(isPublic ? 'eyeOff' : 'eye', { size: 16 }) + '<span>' + (isPublic ? 'Dépublier' : 'Publier') + '</span>';
   }
 
   const select = row.querySelector('[data-status-for]');

@@ -35,7 +35,13 @@ export async function render(context) {
   // Sidebar + header + content
   mount(
     main,
-    `${sidebarHtml(ROUTES.adminLogs)}${adminNavHtml(ROUTES.adminLogs)}${filtersHtml(query)}${loadingHtml()}<div id="logs-results"></div>`,
+    `${sidebarHtml(ROUTES.adminLogs)}${adminNavHtml(ROUTES.adminLogs)}
+      <header class="admin-page-heading"><p class="admin-page-eyebrow">LYNAQE de Sédhiou</p><h1>Journal</h1><p>Consultez les actions de modération enregistrées sur la plateforme.</p></header>
+      ${filtersHtml(query)}
+      <section class="admin-results-panel admin-logs-results" aria-label="Journal de modération">
+        <div id="logs-loading">${loadingHtml('Chargement du journal…')}</div>
+        <div id="logs-results"></div>
+      </section>`,
   );
   wireAdminBar(() => logoutAdmin());
   wireFilters(main, query);
@@ -44,6 +50,7 @@ export async function render(context) {
 
 async function load(context) {
   const container = document.getElementById('logs-results');
+  const loading = document.getElementById('logs-loading');
   const query = normalizedQuery(context.query);
   try {
     const { data, meta } = await adminApi.logs({
@@ -53,6 +60,7 @@ async function load(context) {
       suggestionId: query.suggestionId || undefined,
     });
 
+    loading?.remove();
     container.innerHTML = data.length
       ? `<p class="result-count">${formatNumber(meta.total)} entrée${meta.total > 1 ? 's' : ''}</p>
           <div class="table-wrap"><table class="data-table">
@@ -65,6 +73,7 @@ async function load(context) {
     wirePagination(container, query);
   } catch (error) {
     handleAdminError(error);
+    loading?.remove();
     container.innerHTML = `<div class="state-block state-error" role="alert">${icon('alert', { size: 32 })}<h2>Erreur</h2><p>${esc(error.message)}</p></div>`;
   }
 }
@@ -82,6 +91,30 @@ function filtersHtml(query) {
     <div class="field"><select name="action"><option value="">Toutes les actions</option>${actions}</select></div>
     <button class="btn btn-outline" type="submit">${icon('filter', { size: 16 })} Filtrer</button>
   </form>`;
+}
+
+function wireFilters(main, query) {
+  const form = main.querySelector('#logs-filter-bar');
+  if (!form) return;
+
+  const suggestionIdInput = form.querySelector('[name="suggestionId"]');
+  const actionInput = form.querySelector('[name="action"]');
+  if (suggestionIdInput) suggestionIdInput.value = query.suggestionId;
+  if (actionInput) actionInput.value = query.action;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    navigate(
+      buildHash({
+        page: 1,
+        action: String(data.get('action') ?? ''),
+        suggestionId: String(data.get('suggestionId') ?? '').trim(),
+      }),
+    );
+  });
+
+  actionInput?.addEventListener('change', () => form.requestSubmit());
 }
 
 function wirePagination(container, query) {
