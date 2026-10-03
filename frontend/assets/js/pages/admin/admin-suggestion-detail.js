@@ -1,12 +1,11 @@
 /**
- * Administration — fiche détaillée d'une suggestion : édition, statut,
+ * Administration — fiche détaillée d'une suggestion : consultation, statut,
  * publication, note interne, historique et suppression.
  * Interface moderne et professionnelle.
  */
 
 import {
   SUGGESTION_STATUSES,
-  CATEGORY_META,
   ROUTES,
   LIMITS,
 } from '../../../../../shared/constants.js';
@@ -38,7 +37,7 @@ export async function render(context) {
       `${sidebarHtml(ROUTES.adminSuggestions)}${adminNavHtml(ROUTES.adminSuggestions)}${detailHtml(data)}`,
     );
     wireAdminBar(() => logoutAdmin());
-    wireForms(main, data.suggestion);
+    wireActions(main, data.suggestion);
   } catch (error) {
     handleAdminError(error);
     mount(
@@ -56,9 +55,12 @@ function detailHtml(data) {
   const statusOptions = SUGGESTION_STATUSES.map(
     (status) => `<option value="${esc(status)}" ${status === s.status ? 'selected' : ''}>${esc(status)}</option>`,
   ).join('');
-  const categoryOptions = CATEGORY_META.map(
-    (c) => `<option value="${esc(c.value)}" ${c.value === s.category ? 'selected' : ''}>${esc(c.value)}</option>`,
-  ).join('');
+  const location = s.location
+    ? `<div class="detail-block"><h2>${icon('mapPin', { size: 18 })} Lieu concerné</h2><p>${esc(s.location)}</p></div>`
+    : '';
+  const extraInfo = s.extraInfo
+    ? `<div class="detail-block"><h2>Informations complémentaires</h2><p class="preserve">${esc(s.extraInfo)}</p></div>`
+    : '';
 
   const logRows = data.moderationLogs.length
     ? data.moderationLogs.map(moderationLogHtml).join('')
@@ -74,25 +76,17 @@ function detailHtml(data) {
       </div>
       <h1>${esc(s.title)}</h1>
       <p class="cell-sub">${esc(s.trackingCode ?? '')} · ${formatNumber(s.supportCount)} soutien${pluralize(s.supportCount, '', 's')} · reçue le ${esc(formatDateTime(s.createdAt))}</p>
+      <div class="meta-row"><span class="meta-item">${icon('user', { size: 15 })} ${s.isAnonymous ? 'Auteur anonyme' : 'Suggestion d’un élève'}</span></div>
     </header>
 
     <div class="admin-detail-grid">
       <div class="admin-detail-main">
-        <section class="panel">
-          <h2>${icon('edit', { size: 18 })} Modifier le contenu</h2>
-          <form id="edit-form" class="form">
-            <div class="field"><label for="edit-title">Titre</label><input id="edit-title" name="title" type="text" maxlength="${LIMITS.titleMax}" value="${esc(s.title)}" /></div>
-            <div class="field"><label for="edit-category">Catégorie</label><select id="edit-category" name="category">${categoryOptions}</select></div>
-            <div class="field"><label for="edit-description">Description</label><textarea id="edit-description" name="description" rows="6" maxlength="${LIMITS.descriptionMax}">${esc(s.description)}</textarea></div>
-            <div class="field-row">
-              <div class="field"><label for="edit-location">Lieu</label><input id="edit-location" name="location" type="text" maxlength="${LIMITS.locationMax}" value="${esc(s.location ?? '')}" /></div>
-              <div class="field"><label for="edit-author">Nom de l'auteur</label><input id="edit-author" name="authorName" type="text" maxlength="${LIMITS.authorNameMax}" value="${esc(s.authorName ?? '')}" ${s.isAnonymous ? 'disabled' : ''} /></div>
-            </div>
-            <div class="field"><label for="edit-extra">Informations complémentaires</label><textarea id="edit-extra" name="extraInfo" rows="3" maxlength="${LIMITS.extraInfoMax}">${esc(s.extraInfo ?? '')}</textarea></div>
-            <div class="field"><label for="edit-note">Note interne de modération</label><textarea id="edit-note" name="moderationNote" rows="3" maxlength="${LIMITS.moderationNoteMax}" placeholder="Visible uniquement par l'administration">${esc(s.moderationNote ?? '')}</textarea></div>
-            <div class="form-actions"><button class="btn btn-primary" type="submit">${icon('check', { size: 16 })} Enregistrer les modifications</button></div>
-          </form>
+        <section class="detail-block" aria-labelledby="admin-suggestion-description">
+          <h2 id="admin-suggestion-description">Description</h2>
+          <p class="preserve">${esc(s.description)}</p>
         </section>
+        ${location}
+        ${extraInfo}
 
         <section class="panel">
           <h2>${icon('history', { size: 18 })} Historique du suivi (visible par l'auteur)</h2>
@@ -140,26 +134,7 @@ function detailHtml(data) {
   </div>`;
 }
 
-function wireForms(main, suggestion) {
-  const editForm = main.querySelector('#edit-form');
-  editForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(editForm).entries());
-    const patch = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (key === 'moderationNote' || value !== '') patch[key] = value;
-    }
-    if (suggestion.isAnonymous) delete patch.authorName;
-
-    try {
-      const result = await adminApi.updateSuggestion(suggestion.id, patch);
-      toast('Modifications enregistrées.', 'success');
-      void result;
-    } catch (error) {
-      handleAdminError(error);
-    }
-  });
-
+function wireActions(main, suggestion) {
   main.querySelector('#apply-status').addEventListener('click', async () => {
     const status = main.querySelector('#status-select').value;
     const message = main.querySelector('#status-message').value.trim();
