@@ -143,6 +143,30 @@ html[data-admin] body {
   min-height: 100vh;
 }
 
+html[data-admin-login] body {
+  display: block;
+  min-height: 100vh;
+}
+
+html[data-admin-login] #site-header,
+html[data-admin-login] #site-footer {
+  display: none;
+}
+
+html[data-admin-login] .site-main {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-admin-login] #main > .admin-login-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
 html[data-admin] #site-header,
 html[data-admin] #site-footer {
   display: none;

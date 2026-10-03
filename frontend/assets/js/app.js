@@ -67,9 +67,14 @@ function bootstrap() {
     setActiveNav(path);
     // Mettre à jour la classe admin pour afficher/cacher la sidebar
     const html = document.documentElement;
-    if (isAdminRoute(path) && path !== ROUTES.admin) {
+    if (path === ROUTES.admin) {
+      html.setAttribute('data-admin-login', '');
+      html.removeAttribute('data-admin');
+    } else if (isAdminRoute(path)) {
+      html.removeAttribute('data-admin-login');
       html.setAttribute('data-admin', '');
     } else {
+      html.removeAttribute('data-admin-login');
       html.removeAttribute('data-admin');
     }
     scrollTop();
