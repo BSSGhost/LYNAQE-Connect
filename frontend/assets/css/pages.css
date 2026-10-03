@@ -5813,3 +5813,86 @@
     animation: none;
   }
 }
+
+/* --- Selects globaux : design system LYNAQE Connect ---------------------- */
+:root select:not([multiple]) {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.7rem 2.7rem 0.7rem 0.9rem;
+  appearance: none;
+  border: 1px solid #d9e2ec;
+  border-radius: 11px;
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23123b6d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+  color-scheme: light;
+}
+
+:root select:not([multiple]):hover:not(:disabled) {
+  border-color: #94a9bf;
+}
+
+:root select:not([multiple]):focus-visible {
+  border-color: #38bdf8;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+:root select:not([multiple]):disabled {
+  background-color: var(--surface-2);
+  color: var(--text-soft);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+:root select:not([multiple]) option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+:root select:not([multiple]) option:checked {
+  background: #e0f2fe;
+  color: #123b6d;
+}
+
+:root[data-theme="dark"] select:not([multiple]) {
+  border-color: #2c3b57;
+  color-scheme: dark;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238a99ae' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] select:not([multiple]):hover:not(:disabled) {
+  border-color: #527099;
+}
+
+:root[data-theme="dark"] select:not([multiple]) option:checked {
+  background: #1e3a56;
+  color: #e8eef7;
+}
+
+/* Les filtres et menus d'action gardent une hauteur compacte, avec le même style. */
+:root #admin-filter-bar select:not([multiple]),
+:root #logs-filter-bar select:not([multiple]),
+:root .admin-menu-field select:not([multiple]) {
+  min-height: 40px;
+  padding-block: 0.45rem;
+}
+
+@media (max-width: 520px) {
+  :root select:not([multiple]) {
+    min-height: 48px;
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root select:not([multiple]) {
+    transition: none;
+  }
+}
