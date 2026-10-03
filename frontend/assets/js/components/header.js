@@ -38,7 +38,7 @@ export function renderHeader() {
           ${icon('sun', { size: 20, className: 'icon-sun' })}
           ${icon('moon', { size: 20, className: 'icon-moon' })}
         </button>
-        <a class="btn btn-primary" href="${href(ROUTES.submit)}">${icon('plus', { size: 18 })}<span>Proposer une idée</span></a>
+        <a class="btn btn-primary" href="${href(ROUTES.submit)}" aria-label="Proposer une idée">${icon('plus', { size: 18 })}<span>Proposer une idée</span></a>
         <button class="nav-toggle" type="button" id="nav-toggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="primary-nav">
           ${icon('menu', { size: 22 })}
         </button>

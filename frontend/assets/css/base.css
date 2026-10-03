@@ -266,7 +266,7 @@ html[data-admin][data-sidebar="collapsed"] .admin-header {
    Les éléments volontairement pleine largeur sont exclus (héros, barre
    d'administration) ainsi que les conteneurs déjà dimensionnés. */
 .site-main
-  > *:not(.hero):not(.admin-bar):not(.admin-sidebar):not(.admin-header):not(.container):not(.container-narrow) {
+  > *:not(.hero):not(.admin-bar):not(.admin-sidebar):not(.admin-header):not(.about-page):not(.how-page):not(.container):not(.container-narrow) {
   width: min(100% - 2rem, var(--container));
   margin-inline: auto;
 }
