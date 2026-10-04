@@ -44,11 +44,23 @@ function toggleSidebarState() {
     (window.matchMedia('(max-width: 900px)').matches ? 'collapsed' : 'expanded');
   const next = current === 'collapsed' ? 'expanded' : 'collapsed';
   html.setAttribute('data-sidebar', next);
+  updateSidebarToggleAccessibility(next === 'expanded');
   try {
     sessionStorage.setItem('sidebarState', next);
   } catch (e) {
     /* mode navigation privée : on ignore */
   }
+}
+
+function updateSidebarToggleAccessibility(isExpanded) {
+  const label = isExpanded ? 'Masquer le menu de navigation' : 'Afficher le menu de navigation';
+  const visibleLabel = isExpanded ? 'Masquer' : 'Menu';
+  document.querySelectorAll('#admin-sidebar-toggle, #admin-header-toggle').forEach((button) => {
+    button.setAttribute('aria-expanded', String(isExpanded));
+    button.setAttribute('aria-label', label);
+  });
+  const headerLabel = document.querySelector('#admin-header-toggle .admin-header-toggle-label');
+  if (headerLabel) headerLabel.textContent = visibleLabel;
 }
 
 export function sidebarHtml(active) {
@@ -70,8 +82,8 @@ export function sidebarHtml(active) {
         ${items}
       </nav>
       <p class="admin-sidebar-note">Une idée peut changer le lycée.</p>
-      <button class="admin-sidebar-toggle" id="admin-sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">
-        ✕
+      <button class="admin-sidebar-toggle" id="admin-sidebar-toggle" type="button" aria-label="Masquer le menu de navigation" aria-expanded="true">
+        ${icon('chevronLeft', { size: 20 })}
       </button>
     </div>
   `;
@@ -81,8 +93,9 @@ function headerHtml() {
   return `
     <header class="admin-header" id="admin-header">
       <div class="admin-header-left">
-        <button class="admin-header-toggle" id="admin-header-toggle" type="button" aria-label="Ouvrir le menu">
+        <button class="admin-header-toggle" id="admin-header-toggle" type="button" aria-label="Masquer le menu de navigation" aria-controls="admin-sidebar" aria-expanded="true">
           ${icon('menu', { size: 20 })}
+          <span class="admin-header-toggle-label">Masquer</span>
         </button>
         <div class="admin-header-context"><span>Administration</span><small>LYNAQE Connect</small></div>
       </div>
@@ -109,6 +122,10 @@ export function adminNavHtml() {
  */
 export function wireAdminBar(onLogout) {
   const sidebarToggle = document.getElementById('admin-sidebar-toggle');
+  const sidebarState =
+    document.documentElement.getAttribute('data-sidebar') ||
+    (window.matchMedia('(max-width: 900px)').matches ? 'collapsed' : 'expanded');
+  updateSidebarToggleAccessibility(sidebarState === 'expanded');
   sidebarToggle?.addEventListener('click', toggleSidebarState);
   document.getElementById('admin-header-toggle')?.addEventListener('click', toggleSidebarState);
 

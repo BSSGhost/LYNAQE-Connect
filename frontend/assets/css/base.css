@@ -200,7 +200,23 @@ html[data-admin] .admin-header {
 }
 
 html[data-admin] .admin-header-toggle {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 40px;
+  min-width: 40px;
+  flex: 0 0 auto;
+  gap: 0.45rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
 }
 
 html[data-admin][data-sidebar="collapsed"] .admin-sidebar {
@@ -244,8 +260,10 @@ html[data-admin][data-sidebar="collapsed"] .admin-header {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
+    width: auto;
     height: 40px;
+    min-width: 40px;
+    flex: 0 0 auto;
     margin-right: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
