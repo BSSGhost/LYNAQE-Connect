@@ -33,7 +33,8 @@ async function request(path, { method = 'GET', body, query, auth = false, signal
   const url = `${BASE}${path}${queryString ? `?${queryString}` : ''}`;
 
   const headers = { Accept: 'application/json', 'X-Supporter-Token': getSupporterToken() };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
   if (auth) {
     const token = getAdminToken();
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -44,7 +45,7 @@ async function request(path, { method = 'GET', body, query, auth = false, signal
     response = await fetch(url, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
       signal,
     });
   } catch (error) {
@@ -79,6 +80,41 @@ async function request(path, { method = 'GET', body, query, auth = false, signal
   return { data: payload?.data ?? null, meta: payload?.meta ?? null };
 }
 
+async function requestFile(path, { auth = false, signal } = {}) {
+  const headers = { Accept: 'image/webp', 'X-Supporter-Token': getSupporterToken() };
+  if (auth) {
+    const token = getAdminToken();
+    if (token) headers.Authorization = 'Bearer ' + token;
+  }
+
+  let response;
+  try {
+    response = await fetch(`${BASE}${path}`, { headers, signal });
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new ApiError(
+      'Impossible de joindre le serveur. Vérifiez votre connexion internet, puis réessayez.',
+      { status: 0, code: 'NETWORK_ERROR' },
+    );
+  }
+
+  if (!response.ok) {
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    const error = payload?.error ?? {};
+    throw new ApiError(error.message ?? 'Une erreur inattendue est survenue.', {
+      status: response.status,
+      code: error.code ?? 'ERROR',
+      details: error.details ?? [],
+    });
+  }
+  return response.blob();
+}
+
 export const api = {
   get: (path, options) => request(path, { ...options, method: 'GET' }),
   post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
@@ -97,6 +133,11 @@ export const suggestionsApi = {
   list: (query) => api.get('/suggestions', { query }),
   detail: (id) => api.get(`/suggestions/${id}`),
   create: (payload) => api.post('/suggestions', payload),
+  uploadPhotos: (id, payload, options) => request(`/suggestions/${id}/photos`, {
+    ...options,
+    method: 'POST',
+    body: payload,
+  }),
   support: (id) => api.post(`/suggestions/${id}/support`),
   unsupport: (id) => api.delete(`/suggestions/${id}/support`),
 };
@@ -112,6 +153,11 @@ export const adminApi = {
   statistics: () => api.get('/admin/statistics', { auth: true }),
   suggestions: (query) => api.get('/admin/suggestions', { auth: true, query }),
   suggestion: (id) => api.get(`/admin/suggestions/${id}`, { auth: true }),
+  photo: (suggestionId, photoId, options) =>
+    requestFile(`/admin/suggestions/${suggestionId}/photos/${photoId}/content`, {
+      ...options,
+      auth: true,
+    }),
   updateSuggestion: (id, payload) =>
     api.patch(`/admin/suggestions/${id}`, payload, { auth: true }),
   changeStatus: (id, payload) =>

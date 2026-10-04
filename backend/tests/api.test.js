@@ -3,15 +3,18 @@
  *
  * Ces tests ecrivent REELLEMENT dans MySQL (base `lynaqe_connect_test`,
  * recreee avant l'execution et supprimee apres). Ils verifient le contrat
- * complet : depot, moderation, suivi, soutien, statistiques, journal.
+ * complet : depot, photos privees, moderation, suivi, soutien, statistiques, journal.
  *
  * Lancement : npm test
  */
 
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
+import sharp from 'sharp';
 
 import { createApp } from '../src/app.js';
+import { config } from '../src/config/env.js';
 import { closePool, query } from '../src/config/db.js';
 import { recreateTestDatabase, dropTestDatabase } from './helpers/testDatabase.js';
 import { TEST_ADMIN_PASSWORD } from './setup.js';
@@ -37,6 +40,7 @@ after(async () => {
   await new Promise((resolve) => server.close(resolve));
   await closePool();
   await dropTestDatabase();
+  await rm(config.photos.storageDir, { recursive: true, force: true });
 });
 
 /** Client HTTP minimal. */
@@ -58,6 +62,34 @@ async function api(path, { method = 'GET', body, token, headers = {} } = {}) {
     payload = { raw: text };
   }
   return { status: response.status, body: payload, headers: response.headers };
+}
+
+async function uploadPhotos(path, { files, secretCode, token } = {}) {
+  const form = new FormData();
+  form.append('secretCode', secretCode);
+  for (const [index, file] of files.entries()) {
+    form.append('photos', new Blob([file.buffer], { type: file.type }), file.name ?? `photo-${index}.png`);
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
+    body: form,
+  });
+  const text = await response.text();
+  return {
+    status: response.status,
+    body: text ? JSON.parse(text) : null,
+    headers: response.headers,
+  };
+}
+
+async function makeTestPhoto(color) {
+  return sharp({
+    create: { width: 4, height: 4, channels: 3, background: color },
+  })
+    .png()
+    .toBuffer();
 }
 
 const validSuggestion = (overrides = {}) => ({
@@ -347,6 +379,77 @@ test('GET /api/admin/suggestions/:id renvoie la timeline et le journal', async (
   assert.ok(body.data.timeline.length >= 1);
   assert.ok(body.data.moderationLogs.length >= 1);
   assert.equal(body.data.moderationLogs[0].actor, 'system');
+});
+
+test('les photos sont privées, vérifiées et remplaçables par leur auteur', async () => {
+  const list = await api('/api/admin/suggestions', { token: adminToken });
+  const target = list.body.data.find((item) => item.title === 'Installer des bancs sous le préau');
+  const route = `/api/suggestions/${target.id}/photos`;
+  const firstPhoto = await makeTestPhoto('#123b6d');
+  const firstFile = { buffer: firstPhoto, type: 'image/png', name: 'bancs.png' };
+  const incorrectFormat = await uploadPhotos(route, {
+    files: [{ buffer: Buffer.from('ceci n’est pas une image'), type: 'image/png' }],
+    secretCode: suggestionA.secretCode,
+  });
+  assert.equal(incorrectFormat.status, 422);
+
+  const tooManyPhotos = await uploadPhotos(route, {
+    files: Array.from({ length: 6 }, () => firstFile),
+    secretCode: suggestionA.secretCode,
+  });
+  assert.equal(tooManyPhotos.status, 422);
+
+  const oversizedPhoto = await uploadPhotos(route, {
+    files: [{ buffer: Buffer.alloc(5 * 1024 * 1024 + 1), type: 'image/png' }],
+    secretCode: suggestionA.secretCode,
+  });
+  assert.equal(oversizedPhoto.status, 422);
+
+  const wrongSecret = await uploadPhotos(route, {
+    files: [firstFile],
+    secretCode: 'ZZZZZZZZZZZZ',
+  });
+  assert.equal(wrongSecret.status, 404);
+
+  const uploaded = await uploadPhotos(route, {
+    files: [firstFile],
+    secretCode: suggestionA.secretCode,
+  });
+  assert.equal(uploaded.status, 201);
+  assert.equal(uploaded.body.data.photos.length, 1);
+  assert.equal(uploaded.body.data.photos[0].mimeType, 'image/webp');
+  const firstPhotoId = uploaded.body.data.photos[0].id;
+  const photoUrl = uploaded.body.data.photos[0].contentUrl;
+
+  const privateResponse = await api(photoUrl);
+  assert.equal(privateResponse.status, 401, 'une photo ne doit pas être accessible sans session admin');
+
+  const imageResponse = await fetch(`${baseUrl}${photoUrl}`, {
+    headers: { Authorization: 'Bearer ' + adminToken },
+  });
+  assert.equal(imageResponse.status, 200);
+  assert.equal(imageResponse.headers.get('content-type'), 'image/webp');
+  const decodedPhoto = await sharp(Buffer.from(await imageResponse.arrayBuffer())).metadata();
+  assert.equal(decodedPhoto.format, 'webp');
+
+  const detail = await api(`/api/admin/suggestions/${target.id}`, { token: adminToken });
+  assert.equal(detail.body.data.photos.length, 1);
+
+  const secondPhoto = await makeTestPhoto('#38bdf8');
+  const replaced = await uploadPhotos(route, {
+    files: [{ buffer: secondPhoto, type: 'image/png' }],
+    secretCode: suggestionA.secretCode,
+  });
+  assert.equal(replaced.status, 201);
+  assert.equal(replaced.body.data.photos.length, 1);
+  assert.notEqual(replaced.body.data.photos[0].id, firstPhotoId);
+
+  const removedPhoto = await api(photoUrl, { token: adminToken });
+  assert.equal(removedPhoto.status, 404);
+  const rows = await query('SELECT COUNT(*) AS count FROM suggestion_photos WHERE suggestion_id = ?', [
+    target.id,
+  ]);
+  assert.equal(Number(rows[0].count), 1);
 });
 
 test('GET /api/admin/statistics calcule des chiffres reels', async () => {

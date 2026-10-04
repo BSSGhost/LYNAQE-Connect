@@ -48,6 +48,7 @@ export const REQUIRED_TABLES = Object.freeze([
   'suggestion_updates',
   'supports',
   'moderation_logs',
+  'suggestion_photos',
   'schema_migrations',
 ]);
 
@@ -61,6 +62,8 @@ export const REQUIRED_INDEXES = Object.freeze({
   'suggestion_updates.idx_updates_suggestion_created': 'suggestion_id,created_at,id',
   'supports.uq_supports_suggestion_supporter': 'suggestion_id,supporter_hash',
   'moderation_logs.idx_logs_suggestion': 'suggestion_id,created_at',
+  'suggestion_photos.uq_suggestion_photos_stored_name': 'stored_name',
+  'suggestion_photos.idx_suggestion_photos_suggestion': 'suggestion_id,id',
   'supports.PRIMARY': 'id',
   'moderation_logs.PRIMARY': 'id',
   'suggestion_updates.PRIMARY': 'id',

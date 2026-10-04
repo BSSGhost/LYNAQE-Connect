@@ -94,6 +94,10 @@ function list(name, fallback) {
 const nodeEnv = str('NODE_ENV', 'development');
 const isProduction = nodeEnv === 'production';
 const isTest = nodeEnv === 'test';
+const photoStorageDir = str(
+  'PHOTO_STORAGE_DIR',
+  path.join(PROJECT_ROOT, 'backend', 'data', 'suggestion-photos'),
+);
 
 /**
  * Le secret de signature des jetons de session administrateur.
@@ -153,6 +157,12 @@ export const config = Object.freeze({
     passwordHash: secret('ADMIN_PASSWORD_HASH') ?? '',
     sessionTtl: int('ADMIN_SESSION_TTL', 43200, { min: 300, max: 604800 }),
     issuer: str('JWT_ISSUER', 'lynaqe-connect'),
+  }),
+
+  photos: Object.freeze({
+    storageDir: path.resolve(PROJECT_ROOT, photoStorageDir),
+    maxCount: 5,
+    maxSizeBytes: 5 * 1024 * 1024,
   }),
 
   jwt: Object.freeze({

@@ -38,6 +38,7 @@ export async function render(context) {
     );
     wireAdminBar(() => logoutAdmin());
     wireActions(main, data.suggestion);
+    wirePhotoGallery(main, data.suggestion.id, data.photos ?? []);
   } catch (error) {
     handleAdminError(error);
     mount(
@@ -93,6 +94,8 @@ function detailHtml(data) {
         </section>
         ${location}
         ${extraInfo}
+        ${photosHtml(data.photos ?? [])}
+        <div id="photo-viewer-root"></div>
 
         <section class="panel admin-actions-panel">
           <h2>${icon('shieldCheck', { size: 18 })} Actions administratives</h2>
@@ -163,6 +166,148 @@ function detailHtml(data) {
       </aside>
     </div>
   </div>`;
+}
+
+function photosHtml(photos) {
+  const items = photos.length
+    ? `<div class="admin-photo-grid">${photos
+        .map(
+          (photo, index) => `
+            <button class="admin-photo-button" type="button" data-photo-id="${esc(photo.id)}" data-photo-index="${index}" aria-label="Ouvrir la photo ${index + 1}" aria-busy="true">
+              <span class="admin-photo-loading">${icon('refresh', { size: 20 })}<span>Chargement…</span></span>
+            </button>`,
+        )
+        .join('')}</div>
+      <p class="admin-photo-count">${photos.length} photo${photos.length > 1 ? 's' : ''}</p>`
+    : '<p class="admin-photo-empty">Aucune photo jointe à cette suggestion.</p>';
+  return `
+    <section class="panel admin-photos-panel" aria-labelledby="admin-photos-title">
+      <h2 id="admin-photos-title">${icon('camera', { size: 18 })} Photos jointes</h2>
+      ${items}
+    </section>`;
+}
+
+function wirePhotoGallery(main, suggestionId, photos) {
+  const buttons = [...main.querySelectorAll('[data-photo-id]')];
+  if (!buttons.length) return;
+  const photoUrls = new Array(buttons.length);
+  const gallery = main.querySelector('.admin-photo-grid');
+  let viewerCleanup = null;
+
+  const cleanup = () => {
+    viewerCleanup?.();
+    photoUrls.forEach((url) => {
+      if (url) URL.revokeObjectURL(url);
+    });
+  };
+  window.addEventListener('hashchange', cleanup, { once: true });
+
+  buttons.forEach((button, index) => {
+    adminApi.photo(suggestionId, photos[index].id)
+      .then((blob) => {
+        if (!button.isConnected) {
+          return;
+        }
+        photoUrls[index] = URL.createObjectURL(blob);
+        button.setAttribute('aria-busy', 'false');
+        button.innerHTML = `<img src="${photoUrls[index]}" alt="Photo jointe ${index + 1}" loading="lazy" />`;
+      })
+      .catch(() => {
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'false');
+        button.innerHTML = `<span class="admin-photo-unavailable">${icon('alert', { size: 20 })}<span>Photo indisponible</span></span>`;
+      });
+  });
+
+  gallery?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-photo-index]');
+    if (!button || !photoUrls[Number(button.getAttribute('data-photo-index'))]) return;
+    viewerCleanup = openPhotoViewer(
+      main.querySelector('#photo-viewer-root'),
+      photoUrls,
+      Number(button.getAttribute('data-photo-index')),
+      button,
+    );
+  });
+}
+
+function openPhotoViewer(root, photoUrls, initialIndex, trigger) {
+  let index = initialIndex;
+  root.innerHTML = `
+    <div class="photo-viewer-backdrop" data-viewer-backdrop>
+      <section class="photo-viewer" role="dialog" aria-modal="true" aria-labelledby="photo-viewer-count">
+        <button class="photo-viewer-close" type="button" data-viewer-close aria-label="Fermer la visionneuse">${icon('x', { size: 22 })}</button>
+        <button class="photo-viewer-nav photo-viewer-previous" type="button" data-viewer-previous aria-label="Photo précédente">${icon('chevronLeft', { size: 24 })}</button>
+        <img class="photo-viewer-image" data-viewer-image alt="" />
+        <button class="photo-viewer-nav photo-viewer-next" type="button" data-viewer-next aria-label="Photo suivante">${icon('chevronRight', { size: 24 })}</button>
+        <p id="photo-viewer-count" class="photo-viewer-count"></p>
+      </section>
+    </div>`;
+
+  const backdrop = root.querySelector('[data-viewer-backdrop]');
+  const image = root.querySelector('[data-viewer-image]');
+  const count = root.querySelector('#photo-viewer-count');
+  const closeButton = root.querySelector('[data-viewer-close]');
+  const previousButton = root.querySelector('[data-viewer-previous]');
+  const nextButton = root.querySelector('[data-viewer-next]');
+
+  const render = () => {
+    image.src = photoUrls[index];
+    image.alt = `Photo ${index + 1} sur ${photoUrls.length}`;
+    count.textContent = `Photo ${index + 1} sur ${photoUrls.length}`;
+    previousButton.hidden = photoUrls.length < 2;
+    nextButton.hidden = photoUrls.length < 2;
+  };
+  const close = () => {
+    root.innerHTML = '';
+    trigger.focus();
+  };
+  const keydown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    } else if (event.key === 'ArrowLeft' && photoUrls.length > 1) {
+      event.preventDefault();
+      index = (index - 1 + photoUrls.length) % photoUrls.length;
+      render();
+    } else if (event.key === 'ArrowRight' && photoUrls.length > 1) {
+      event.preventDefault();
+      index = (index + 1) % photoUrls.length;
+      render();
+    } else if (event.key === 'Tab') {
+      const focusable = [...root.querySelectorAll('button:not([hidden])')];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
+  closeButton.addEventListener('click', close);
+  previousButton.addEventListener('click', () => {
+    index = (index - 1 + photoUrls.length) % photoUrls.length;
+    render();
+  });
+  nextButton.addEventListener('click', () => {
+    index = (index + 1) % photoUrls.length;
+    render();
+  });
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) close();
+  });
+  document.addEventListener('keydown', keydown);
+  render();
+  closeButton.focus();
+
+  return () => {
+    document.removeEventListener('keydown', keydown);
+    root.innerHTML = '';
+  };
 }
 
 function wireActions(main, suggestion) {

@@ -15,6 +15,10 @@ import { formatTrackingCode } from '../core/format.js';
 import { toast, copyText } from '../core/ui.js';
 import { pageHeader, breadcrumbs } from '../components/layout.js';
 
+const MAX_PHOTOS = 5;
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 export async function render() {
   const main = document.getElementById('main');
   const categories = CATEGORY_META.map(
@@ -51,6 +55,26 @@ export async function render() {
         <textarea id="description" name="description" rows="7" maxlength="${LIMITS.descriptionMax}" placeholder="Explique le problème, ta proposition et le bénéfice attendu." required></textarea>
         <div class="field-foot"><span class="error" data-error="description"></span><span class="${counterClass(0, LIMITS.descriptionMax)}" data-counter="description">0 / ${LIMITS.descriptionMax}</span></div>
       </div>
+
+      <section class="photo-upload-section" aria-labelledby="photo-upload-title">
+        <div class="photo-upload-heading">
+          <h2 id="photo-upload-title">${icon('camera', { size: 19 })} Ajouter des photos <span class="opt">(facultatif)</span></h2>
+          <p class="field-hint">Ajoutez des photos pour illustrer votre suggestion et aider l'administration à mieux comprendre la situation.</p>
+        </div>
+        <label class="photo-dropzone" id="photo-dropzone" for="suggestion-photos">
+          <input id="suggestion-photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+          <span class="photo-dropzone-icon">${icon('camera', { size: 26 })}</span>
+          <strong>Ajouter des photos</strong>
+          <span>Cliquez pour sélectionner vos photos ou glissez-déposez-les ici</span>
+          <small>JPG, PNG ou WEBP · 5 Mo maximum par photo</small>
+        </label>
+        <div class="photo-gallery-header">
+          <span id="photo-count">0 / ${MAX_PHOTOS} photos</span>
+          <span>Les photos restent privées et ne sont visibles que par l’administration.</span>
+        </div>
+        <div class="photo-preview-grid" id="photo-previews" aria-live="polite"></div>
+        <p class="photo-upload-error" id="photo-upload-error" role="alert" hidden></p>
+      </section>
 
       <div class="field-row">
         <div class="field">
@@ -107,6 +131,43 @@ export async function render() {
   const form = main.querySelector('#suggestion-form');
   const anonymousInput = form.querySelector('#isAnonymous');
   const identity = form.querySelector('[data-identity]');
+  const photoInput = form.querySelector('#suggestion-photos');
+  const photoDropzone = form.querySelector('#photo-dropzone');
+  const photoPreviews = form.querySelector('#photo-previews');
+  const photoCount = form.querySelector('#photo-count');
+  const photoError = form.querySelector('#photo-upload-error');
+  const photos = [];
+  const releasePhotoPreviews = () => {
+    photos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+  };
+  window.addEventListener('hashchange', releasePhotoPreviews, { once: true });
+
+  photoInput.addEventListener('change', async () => {
+    await addSelectedPhotos(photoInput.files, photos, photoCount, photoPreviews, photoError);
+    photoInput.value = '';
+  });
+
+  photoDropzone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    photoDropzone.classList.add('is-dragging');
+  });
+  photoDropzone.addEventListener('dragleave', (event) => {
+    if (!photoDropzone.contains(event.relatedTarget)) photoDropzone.classList.remove('is-dragging');
+  });
+  photoDropzone.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    photoDropzone.classList.remove('is-dragging');
+    await addSelectedPhotos(event.dataTransfer.files, photos, photoCount, photoPreviews, photoError);
+  });
+
+  photoPreviews.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-photo]');
+    if (!button) return;
+    const index = Number(button.getAttribute('data-remove-photo'));
+    const [removed] = photos.splice(index, 1);
+    if (removed) URL.revokeObjectURL(removed.previewUrl);
+    renderPhotoPreviews(photos, photoCount, photoPreviews);
+  });
 
   anonymousInput.addEventListener('change', () => {
     identity.hidden = anonymousInput.checked;
@@ -155,8 +216,11 @@ export async function render() {
         authorName: values.isAnonymous ? undefined : values.authorName || undefined,
         authorContact: values.isAnonymous ? undefined : values.authorContact || undefined,
       });
-      renderConfirmation(main, data);
+      window.removeEventListener('hashchange', releasePhotoPreviews);
+      releasePhotoPreviews();
+      renderConfirmation(main, data, photos);
       toast(SUBMIT_SUCCESS_MESSAGE, 'success');
+      if (photos.length) void uploadPhotosForConfirmation(main, data, photos);
     } catch (error) {
       if (error.details?.length) {
         const mapped = {};
@@ -168,6 +232,60 @@ export async function render() {
       button.innerHTML = `${icon('send', { size: 18 })} Envoyer ma suggestion`;
     }
   });
+}
+
+async function addSelectedPhotos(fileList, photos, count, gallery, errorNode) {
+  errorNode.hidden = true;
+  errorNode.textContent = '';
+  const errors = [];
+
+  for (const file of Array.from(fileList ?? [])) {
+    if (photos.length >= MAX_PHOTOS) {
+      errors.push(`Vous pouvez ajouter au maximum ${MAX_PHOTOS} photos.`);
+      break;
+    }
+    if (!PHOTO_TYPES.has(file.type)) {
+      errors.push(`${file.name || 'Ce fichier'} : ce format d'image n'est pas accepté.`);
+      continue;
+    }
+    if (file.size > MAX_PHOTO_SIZE) {
+      errors.push(`${file.name || 'Cette image'} dépasse la taille maximale de 5 Mo.`);
+      continue;
+    }
+
+    let previewUrl;
+    try {
+      previewUrl = URL.createObjectURL(file);
+      const decodedImage = await createImageBitmap(file);
+      decodedImage.close();
+      photos.push({ file, previewUrl });
+    } catch {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      errors.push(`${file.name || 'Ce fichier'} est invalide ou ne peut pas être lu comme une image.`);
+    }
+  }
+
+  renderPhotoPreviews(photos, count, gallery);
+  if (errors.length) {
+    errorNode.textContent = errors.join(' ');
+    errorNode.hidden = false;
+  }
+}
+
+function renderPhotoPreviews(photos, count, gallery) {
+  count.textContent = `${photos.length} / ${MAX_PHOTOS} photos`;
+  gallery.innerHTML = photos
+    .map(
+      (photo, index) => `
+        <figure class="photo-preview">
+          <img src="${photo.previewUrl}" alt="Aperçu de la photo ${index + 1}" />
+          <button type="button" data-remove-photo="${index}" aria-label="Supprimer la photo ${index + 1}">
+            ${icon('x', { size: 16 })}
+          </button>
+          <figcaption>Photo ${index + 1}</figcaption>
+        </figure>`,
+    )
+    .join('');
 }
 
 function formValues(form) {
@@ -203,7 +321,7 @@ function showErrors(form, errors) {
   first?.focus();
 }
 
-function renderConfirmation(main, data) {
+function renderConfirmation(main, data, photos = []) {
   const tracking = formatTrackingCode(data.trackingCode);
   const secret = data.secretCode;
   const suggestion = data.suggestion;
@@ -232,6 +350,8 @@ function renderConfirmation(main, data) {
 
       <p class="notice notice-warning">${icon('alert', { size: 16 })} Note ces deux informations : le code secret ne sera plus jamais affiché.</p>
 
+      ${photos.length ? `<p class="notice notice-info" id="photo-upload-status" role="status">${icon('refresh', { size: 16 })} Envoi de ${photos.length} photo${photos.length > 1 ? 's' : ''} à l’administration…</p>` : ''}
+
       ${suggestion ? `<p class="field-hint">Suggestion enregistrée le ${esc(new Date(suggestion.createdAt).toLocaleDateString('fr-FR'))} — statut : ${esc(suggestion.status)}.</p>` : ''}
 
       <div class="form-actions">
@@ -247,4 +367,36 @@ function renderConfirmation(main, data) {
       toast(ok ? 'Copié dans le presse-papiers.' : 'Impossible de copier automatiquement.', ok ? 'success' : 'warning');
     });
   });
+}
+
+async function uploadPhotosForConfirmation(main, data, photos) {
+  const status = main.querySelector('#photo-upload-status');
+  if (!status) return;
+  const formData = new FormData();
+  formData.append('secretCode', data.secretCode);
+  photos.forEach(({ file }) => formData.append('photos', file, 'photo'));
+
+  try {
+    await suggestionsApi.uploadPhotos(data.suggestion.id, formData);
+    if (status.isConnected) {
+      status.className = 'notice notice-success';
+      status.textContent = `${photos.length} photo${photos.length > 1 ? 's ont' : ' a'} également été transmise${photos.length > 1 ? 's' : 'e'} à l’administration pour aider à l’examen de votre suggestion.`;
+    }
+  } catch {
+    if (!status.isConnected) return;
+    status.className = 'notice notice-warning';
+    status.textContent = 'Votre suggestion a bien été envoyée, mais les photos n’ont pas pu être jointes. Vous pouvez réessayer sans renvoyer la suggestion.';
+    const retry = document.createElement('button');
+    retry.className = 'btn btn-outline btn-sm photo-upload-retry';
+    retry.type = 'button';
+    retry.textContent = 'Réessayer l’envoi des photos';
+    status.append(' ', retry);
+    retry.addEventListener('click', async () => {
+      retry.disabled = true;
+      retry.textContent = 'Nouvel envoi…';
+      status.textContent = 'Nouvel envoi des photos…';
+      status.append(retry);
+      await uploadPhotosForConfirmation(main, data, photos);
+    }, { once: true });
+  }
 }

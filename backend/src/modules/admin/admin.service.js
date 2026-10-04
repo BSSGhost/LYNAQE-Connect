@@ -23,6 +23,11 @@ import {
   listSuggestionUpdates,
   listModerationLogs,
 } from '../suggestions/suggestion.repository.js';
+import {
+  getAdminPhotoFile,
+  listSuggestionPhotos,
+  removeSuggestionPhotoFiles,
+} from '../suggestions/suggestion-photos.js';
 
 /** Contexte d'audit transmis par les controleurs. */
 function audit(ctx) {
@@ -55,15 +60,22 @@ export async function listSuggestions(filters) {
 /** Detail complet : suggestion + timeline + journal de moderation. */
 export async function getSuggestion(id) {
   const row = await loadOrFail(id);
-  const [timeline, logs] = await Promise.all([
+  const [timeline, logs, photos] = await Promise.all([
     listSuggestionUpdates(row.id),
     listSuggestionModerationLogs(row.id),
+    listSuggestionPhotos(row.id),
   ]);
   return {
     suggestion: toAdminSuggestion(row),
     timeline: timeline.map(toSuggestionUpdate),
     moderationLogs: logs.map(toModerationLog),
+    photos,
   };
+}
+
+/** Chemin prive d'une photo, accessible uniquement via la route admin protegee. */
+export function getSuggestionPhotoFile(suggestionId, photoId) {
+  return getAdminPhotoFile(suggestionId, photoId);
 }
 
 /**
@@ -298,7 +310,7 @@ export async function updateSuggestion(id, patch, ctx) {
  * (`ON DELETE CASCADE`) pour ne pas laisser de ligne orpheline.
  */
 export async function removeSuggestion(id, ctx) {
-  return transaction(async (connection) => {
+  const deleted = await transaction(async (connection) => {
     const row = await findAdminSuggestionByIdIn(connection, id);
     if (!row) throw notFound('Cette suggestion n’existe pas.');
 
@@ -316,6 +328,8 @@ export async function removeSuggestion(id, ctx) {
     await connection.execute('DELETE FROM suggestions WHERE id = ?', [id]);
     return { deletedId: Number(id) };
   });
+  await removeSuggestionPhotoFiles(id);
+  return deleted;
 }
 
 /** Journal de moderation global. */

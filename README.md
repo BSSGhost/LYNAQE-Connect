@@ -37,7 +37,8 @@ et chacun peut suivre l’avancement de sa propre suggestion.
 - **Accueil** : présentation, chiffres clés, dernières suggestions, état vide accompagné d’un appel à l’action.
 - **Proposer une idée** : formulaire complet (titre, catégorie, description, lieu, informations complémentaires),
   option d’envoi anonyme, compteur de caractères, validation côté client **et** côté serveur,
-  puis écran de confirmation affichant le **numéro de suivi** et le **code secret** (affichés une seule fois).
+  ajout facultatif de cinq photos privées maximum, puis écran de confirmation affichant le
+  **numéro de suivi** et le **code secret** (affichés une seule fois).
 - **Suggestions** : liste paginée, filtres par catégorie et statut, tri, état vide explicite.
 - **Détail d’une suggestion** : description, progression, historique de modération, bouton de soutien
   (un soutien par appareil, le serveur faisant autorité), partage du lien.
@@ -52,7 +53,7 @@ et chacun peut suivre l’avancement de sa propre suggestion.
 - **Liste des suggestions** : recherche, filtres (catégorie, statut, visibilité), tri, pagination,
   modification rapide du statut, bascule de visibilité, suppression.
 - **Détail administrateur** : édition complète (titre, description, catégorie, statut, lieu, auteur, informations complémentaires),
-  note interne de modération, historique et journal des actions.
+  photos jointes visibles uniquement par l’administration, note interne de modération, historique et journal des actions.
 - **Statistiques** : totaux par statut et par catégorie, taux de publication, répartitions, graphiques.
 - **Journal d’audit** : actions de modération filtrables et paginées.
 
@@ -64,7 +65,8 @@ et chacun peut suivre l’avancement de sa propre suggestion.
 | --- | --- |
 | Frontend | HTML5, CSS3 (variables CSS, themes clair/sombre), JavaScript ES2022 en modules natifs, **aucun build** |
 | Backend | Node.js + Express, architecture par modules |
-| Base de données | MySQL 8 (InnoDB, `utf8mb4`) |
+| Base de données | MySQL 8 (InnoDB, `utf8mb4`) ; métadonnées des photos uniquement |
+| Photos privées | Fichiers optimisés WebP hors du répertoire public, références en MySQL |
 | Authentification | Jeton de session signé (HMAC), mot de passe stocké en scrypt |
 | Sécurité | CSP stricte sans script inline, Helmet, limitation de débit, validation et requêtes préparées |
 
@@ -150,6 +152,7 @@ en développement, `.env.production.example` pour un hébergeur (Render, VPS).
 | `DB_CREATE_IF_MISSING`, `DB_CONNECTION_LIMIT`, `DB_SSL` | Options de connexion |
 | `ADMIN_PASSWORD`, `ADMIN_PASSWORD_HASH` | Accès administration (serveur uniquement) |
 | `ADMIN_SESSION_TTL`, `JWT_SECRET`, `JWT_ISSUER` | Sessions administrateur |
+| `PHOTO_STORAGE_DIR` | Répertoire privé et persistant des photos (défaut : `backend/data/suggestion-photos`) |
 | `RATE_LIMIT_*` | Limitation de débit par famille de routes |
 | `LOG_LEVEL` | Niveau de journalisation serveur |
 
@@ -213,6 +216,7 @@ ou `{ "success": false, "error": { code, message, details? } }`.
 | `GET` | `/api/suggestions` | Liste paginée et filtrable des suggestions publiques |
 | `GET` | `/api/suggestions/:id` | Détail d’une suggestion publique |
 | `POST` | `/api/suggestions` | Dépôt d’une suggestion (retourne numéro de suivi et code secret) |
+| `POST` | `/api/suggestions/:id/photos` | Ajout/remplacement des photos (multipart `photos`, autorisé par le code secret de la suggestion) |
 | `POST` | `/api/suggestions/:id/support` | Soutien (un par appareil) |
 | `POST` | `/api/tracking` | Suivi par numéro de suivi + code secret |
 
@@ -226,6 +230,7 @@ ou `{ "success": false, "error": { code, message, details? } }`.
 | `GET` | `/api/admin/statistics` | Statistiques globales |
 | `GET` | `/api/admin/suggestions` | Liste administrateur (tous statuts, tous Auteur) |
 | `GET` | `/api/admin/suggestions/:id` | Détail administrateur |
+| `GET` | `/api/admin/suggestions/:id/photos/:photoId/content` | Photo privée, session administrateur obligatoire |
 | `PATCH` | `/api/admin/suggestions/:id` | Édition |
 | `PATCH` | `/api/admin/suggestions/:id/status` | Changement de statut |
 | `PATCH` | `/api/admin/suggestions/:id/moderation` | Note interne et visibilité |
@@ -247,7 +252,7 @@ Ces listes, les libellés, les limites de saisie et les messages du projet sont 
 dans `shared/constants.js`, chargé par le backend et servi au frontend sur `/shared/constants.js` :
 le client et le serveur ne peuvent pas diverger.
 
-Migrations : `database/migrations/001…004` (suggestions, historique, soutiens, journal de modération).
+Migrations : `database/migrations/001…005` (suggestions, historique, soutiens, journal de modération, photos).
 Aucune donnée fictive n’est insérée en production.
 
 ---
@@ -259,8 +264,8 @@ cd backend
 npm test
 ```
 
-- **68 tests** au total : 26 tests unitaires (validation, formatage, règles métier) et 42 tests d’intégration
-  (API complète : dépôt, liste, détail, soutien, suivi, authentification, administration, statistiques, journal).
+- **69 tests** au total : 26 tests unitaires (validation, formatage, règles métier) et 43 tests d’intégration
+  (API complète : dépôt, photos privées, liste, détail, soutien, suivi, authentification, administration, statistiques, journal).
 - Les tests utilisent la base `lynaqe_connect_test`, créée puis remise à zéro automatiquement ;
   **la base de production n’est jamais touchée**.
 - Vérifications complémentaires possibles : `npm run check` (schéma) et `npm run migrate:status`.
@@ -386,6 +391,12 @@ Puis, dans le navigateur : déposer une suggestion, la suivre, et vous connecter
 ## Sécurité
 
 - **CSP stricte** : aucun script inline ; le thème est appliqué par `theme-boot.js` avant la première peinture.
+- **Photos privées** : format vérifié par décodage puis réencodé en WebP (métadonnées EXIF retirées),
+  5 fichiers maximum de 5 Mo à l’entrée. Les fichiers ne sont jamais servis comme ressources statiques ;
+  l’envoi exige le code secret de la suggestion et la lecture passe par une route réservée à l’administration.
+- **Stockage persistant** : le répertoire `PHOTO_STORAGE_DIR` doit être hors du dossier `frontend` et sur un
+  volume persistant en production. Sur un hébergeur à disque éphémère, configurez un disque persistant avant
+  d’activer les photos, sinon elles seront perdues au redémarrage ou au redéploiement.
 - **Mots de passe** : hash **scrypt** avec sel aléatoire ; jamais de clair en base, jamais dans le frontend.
 - **Sessions** : jeton signé (HMAC), durée de vie configurable, révocation à la déconnexion,
   transmis uniquement via `Authorization: Bearer`.

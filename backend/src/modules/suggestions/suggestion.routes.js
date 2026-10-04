@@ -17,10 +17,29 @@ import { parseIdParam } from '../../http/params.js';
 import { schemas } from '../../validation/schemas.js';
 import { PROJECT, SUBMIT_SUCCESS_MESSAGE } from '../../../../shared/constants.js';
 import * as service from './suggestion.service.js';
+import {
+  parseSuggestionPhotos,
+  replaceSuggestionPhotos,
+} from './suggestion-photos.js';
 
 export const suggestionRouter = Router();
 
 suggestionRouter.param('id', parseIdParam);
+
+/** Ajoute ou remplace les photos privées en prouvant la possession du code secret. */
+suggestionRouter.post(
+  '/:id/photos',
+  submitLimiter,
+  parseSuggestionPhotos,
+  asyncHandler(async (req, res) => {
+    const photos = await replaceSuggestionPhotos(
+      req.resourceId,
+      req.body.secretCode,
+      req.files,
+    );
+    return created(res, { photos });
+  }),
+);
 
 /** Depot d'une suggestion. Le code secret n'est renvoye qu'ici, une seule fois. */
 suggestionRouter.post(

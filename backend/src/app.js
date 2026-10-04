@@ -43,7 +43,7 @@ export function createApp() {
           // Les barres de progression et les variables de theme sont ecrites
           // via l'attribut `style` : 'unsafe-inline' reste limite aux styles.
           'style-src': ["'self'", "'unsafe-inline'"],
-          'img-src': ["'self'", 'data:'],
+          'img-src': ["'self'", 'data:', 'blob:'],
           'font-src': ["'self'"],
           'connect-src': ["'self'"],
           'object-src': ["'none'"],

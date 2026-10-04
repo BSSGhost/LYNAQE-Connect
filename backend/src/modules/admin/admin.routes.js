@@ -37,6 +37,13 @@ export const adminRouter = Router();
 
 adminRouter.param('id', parseIdParam);
 
+function validatePhotoId(req, res, next) {
+  if (!/^[1-9]\d{0,19}$/u.test(req.params.photoId)) {
+    return next(notFound('Cette photo n’existe pas.'));
+  }
+  return next();
+}
+
 // ---------------------------------------------------------------------------
 // Session
 // ---------------------------------------------------------------------------
@@ -122,6 +129,32 @@ adminRouter.get(
       total: result.total,
       totalPages: result.totalPages,
     });
+  }),
+);
+
+adminRouter.get(
+  '/suggestions/:id/photos/:photoId/content',
+  adminLimiter,
+  requireAdmin,
+  validatePhotoId,
+  asyncHandler(async (req, res, next) => {
+    const filePath = await adminService.getSuggestionPhotoFile(
+      req.resourceId,
+      req.params.photoId,
+    );
+    res.type('image/webp');
+    res.sendFile(
+      filePath,
+      {
+        headers: {
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      },
+      (error) => {
+        if (error) next(error);
+      },
+    );
   }),
 );
 
