@@ -369,6 +369,14 @@ test('GET /api/admin/suggestions voit les suggestions non publiees', async () =>
   assert.ok(titles.includes('Installer des bancs sous le préau'));
 });
 
+test('GET /api/admin/queue ne contient que les trois statuts à traiter', async () => {
+  const { status, body } = await api('/api/admin/queue', { token: adminToken });
+  assert.equal(status, 200);
+  assert.deepEqual(Object.keys(body.data.counts), ['En attente', 'Reçue', 'À l’étude']);
+  assert.equal(body.data.items.length, 2);
+  assert.ok(body.data.items.every((item) => ['En attente', 'Reçue', 'À l’étude'].includes(item.status)));
+});
+
 test('GET /api/admin/suggestions/:id renvoie la timeline et le journal', async () => {
   const list = await api('/api/admin/suggestions', { token: adminToken });
   const target = list.body.data.find((item) => item.title === 'Installer des bancs sous le préau');
@@ -487,6 +495,19 @@ test('GET /api/admin/statistics calcule des chiffres reels', async () => {
   assert.equal(stats.evolution.monthly.at(-1).count, 2);
 });
 
+test('la file enregistre les pourcentages et la date prévue seulement pendant En cours', async () => {
+  const list = await api('/api/admin/suggestions', { token: adminToken });
+  const target = list.body.data.find((item) => item.title === 'Installer des bancs sous le préau');
+  const updated = await api(`/api/admin/suggestions/${target.id}/status`, {
+    method: 'PATCH',
+    token: adminToken,
+    body: { status: 'En cours', progressPercent: 80, expectedCompletionDate: '2026-10-20' },
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.data.suggestion.progressPercent, 80);
+  assert.equal(updated.body.data.suggestion.expectedCompletionDate, '2026-10-20');
+});
+
 test('PATCH /api/admin/suggestions/:id/status change reellement le statut', async () => {
   const list = await api('/api/admin/suggestions', { token: adminToken });
   const target = list.body.data.find((item) => item.title === 'Installer des bancs sous le préau');
@@ -506,6 +527,8 @@ test('PATCH /api/admin/suggestions/:id/status change reellement le statut', asyn
   assert.equal(body.data.suggestion.status, 'Réalisée');
   assert.equal(body.data.suggestion.visibility, 'publique');
   assert.ok(body.data.suggestion.publishedAt, 'published_at doit etre renseigne');
+  assert.equal(body.data.suggestion.progressPercent, null, 'les champs de réalisation sont effacés hors En cours');
+  assert.equal(body.data.suggestion.expectedCompletionDate, null);
 
   // Verite en base.
   const rows = await query('SELECT status, visibility, published_at FROM suggestions WHERE id = ?', [
@@ -514,6 +537,70 @@ test('PATCH /api/admin/suggestions/:id/status change reellement le statut', asyn
   assert.equal(rows[0].status, 'Réalisée');
   assert.equal(rows[0].visibility, 'publique');
   assert.ok(rows[0].published_at instanceof Date);
+});
+
+test('une réponse officielle est visible dans le suivi et dans les mises en avant publiques', async () => {
+  const tracking = await api('/api/tracking', {
+    method: 'POST',
+    body: { trackingCode: suggestionA.trackingCode, secretCode: suggestionA.secretCode },
+  });
+  const response = tracking.body.data.timeline.find((event) =>
+    event.message === 'Les bancs ont été installés pendant les vacances.',
+  );
+  assert.equal(response.authorType, 'admin');
+  assert.equal(response.newStatus, 'Réalisée');
+
+  const highlights = await api('/api/highlights');
+  assert.equal(highlights.status, 200);
+  assert.ok(highlights.body.data.popular.length === 0, 'les idées sans soutien ne sont pas classées');
+});
+
+test('l’administration choisit une idée du mois publique et peut la retirer', async () => {
+  const list = await api('/api/admin/suggestions', { token: adminToken });
+  const target = list.body.data.find((item) => item.title === 'Installer des bancs sous le préau');
+  const selected = await api('/api/admin/monthly-idea', {
+    method: 'PATCH',
+    token: adminToken,
+    body: { suggestionId: target.id },
+  });
+  assert.equal(selected.status, 200);
+  assert.equal(selected.body.data.suggestionId, target.id);
+
+  const highlights = await api('/api/highlights');
+  assert.equal(highlights.body.data.monthlyIdea.id, target.id);
+
+  const removed = await api('/api/admin/monthly-idea', {
+    method: 'PATCH',
+    token: adminToken,
+    body: { suggestionId: null },
+  });
+  assert.equal(removed.body.data.suggestionId, null);
+  assert.equal((await api('/api/highlights')).body.data.monthlyIdea, null);
+});
+
+test('un appareil peut signaler une suggestion une seule fois et l’admin peut traiter le signalement', async () => {
+  const publicList = await api('/api/suggestions');
+  const target = publicList.body.data[0];
+  const route = `/api/suggestions/${target.id}/reports`;
+  const first = await api(route, { method: 'POST', body: { reason: 'Contenu offensant' } });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.data.alreadyReported, false);
+
+  const duplicate = await api(route, { method: 'POST', body: { reason: 'Spam' } });
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.data.alreadyReported, true);
+
+  const details = await api(`/api/admin/suggestions/${target.id}`, { token: adminToken });
+  assert.equal(details.body.data.suggestion.reportCount, 1);
+  assert.equal(details.body.data.reports[0].reason, 'Contenu offensant');
+  const reportId = details.body.data.reports[0].id;
+
+  const removed = await api(`/api/admin/suggestions/${target.id}/reports/${reportId}`, {
+    method: 'DELETE',
+    token: adminToken,
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.data.reportCount, 0);
 });
 
 test('la suggestion publiee apparait dans la liste publique', async () => {
@@ -649,19 +736,19 @@ test('les statistiques incluent les soutiens reels', async () => {
 // Modification, depublication, rejet, archivage, suppression
 // ---------------------------------------------------------------------------
 
-test('PATCH /api/admin/suggestions/:id modifie le contenu', async () => {
+test('PATCH /api/admin/suggestions/:id interdit la modification du contenu', async () => {
   const list = await api('/api/admin/suggestions', { token: adminToken });
   const target = list.body.data.find((item) => item.title === 'Ajouter un point d’eau');
 
-  const { status, body } = await api(`/api/admin/suggestions/${target.id}`, {
+  const { status } = await api(`/api/admin/suggestions/${target.id}`, {
     method: 'PATCH',
     token: adminToken,
-    body: { title: 'Installer deux points d’eau supplémentaires', moderationNote: 'Urgence sanitaire.' },
+    body: { title: 'Installer deux points d’eau supplémentaires' },
   });
 
-  assert.equal(status, 200);
-  assert.equal(body.data.suggestion.title, 'Installer deux points d’eau supplémentaires');
-  assert.equal(body.data.suggestion.moderationNote, 'Urgence sanitaire.');
+  assert.equal(status, 404);
+  const { body } = await api(`/api/admin/suggestions/${target.id}`, { token: adminToken });
+  assert.equal(body.data.suggestion.title, 'Ajouter un point d’eau');
 });
 
 test('PATCH /api/admin/suggestions/:id/moderation retire la publication', async () => {

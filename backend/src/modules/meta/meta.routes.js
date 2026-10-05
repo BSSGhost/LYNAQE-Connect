@@ -14,6 +14,7 @@ import { ok } from '../../http/responses.js';
 import { ping } from '../../config/db.js';
 import { config } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
+import { getPublicHighlights } from '../suggestions/suggestion.service.js';
 import {
   PROJECT,
   STATUS_META,
@@ -24,6 +25,11 @@ import {
 } from '../../../../shared/constants.js';
 
 export const metaRouter = Router();
+
+metaRouter.get(
+  '/highlights',
+  asyncHandler(async (req, res) => ok(res, await getPublicHighlights())),
+);
 
 /**
  * Source de verite exposee au frontend.

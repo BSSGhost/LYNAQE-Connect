@@ -52,6 +52,13 @@ export function toPublicSuggestion(row) {
     statusInfo: statusInfo(row.status),
     isAnonymous: Boolean(row.is_anonymous),
     supportCount: Number(row.support_count ?? 0),
+    progressPercent: row.progress_percent === null || row.progress_percent === undefined
+      ? null
+      : Number(row.progress_percent),
+    expectedCompletionDate: row.expected_completion_date instanceof Date
+      ? row.expected_completion_date.toISOString().slice(0, 10)
+      : row.expected_completion_date ?? null,
+    monthlyIdeaAt: iso(row.monthly_idea_at),
     publishedAt: iso(row.published_at),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
@@ -82,6 +89,8 @@ export function toAdminSuggestion(row) {
     authorContact: row.is_anonymous ? null : row.author_contact,
     isAnonymous: Boolean(row.is_anonymous),
     moderationNote: row.moderation_note,
+    reportCount: Number(row.report_count ?? 0),
+    isMonthlyIdea: Number(row.is_monthly_idea) === 1,
     publishedAt: iso(row.published_at),
   };
 }

@@ -41,6 +41,16 @@ suggestionRouter.post(
   }),
 );
 
+/** Signalement public, limite à un par appareil pour chaque suggestion. */
+suggestionRouter.post(
+  '/:id/reports',
+  publicLimiter,
+  validateBody(schemas.reportSuggestion, 'Le motif de signalement est invalide.'),
+  asyncHandler(async (req, res) =>
+    ok(res, await service.reportSuggestion(req.resourceId, req.body.reason, req)),
+  ),
+);
+
 /** Depot d'une suggestion. Le code secret n'est renvoye qu'ici, une seule fois. */
 suggestionRouter.post(
   '/',

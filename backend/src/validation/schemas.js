@@ -19,6 +19,7 @@ import {
   SUGGESTION_STATUSES,
   CATEGORIES,
   VISIBILITIES,
+  REPORT_REASONS,
   LIMITS,
 } from '../../../shared/constants.js';
 import { normalizeTrackingCode, normalizeSecretCode } from '../utils/codes.js';
@@ -93,6 +94,16 @@ const categoryField = canonicalEnum(CATEGORIES, {
 const visibilityField = canonicalEnum(VISIBILITIES, {
   errorMap: () => ({ message: 'Visibilité invalide. Valeurs autorisées : privee, publique.' }),
 });
+const reportReasonField = canonicalEnum(REPORT_REASONS, {
+  errorMap: () => ({ message: 'Motif de signalement invalide.' }),
+});
+const dateField = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/u, 'Format de date attendu : AAAA-MM-JJ.')
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, 'Date invalide.');
 
 // ---------------------------------------------------------------------------
 // Suggestion
@@ -162,6 +173,22 @@ export const updateStatus = z
     message: optionalText(LIMITS.adminMessageMax),
     /** Passe (true) ou retire (false) la publication publique. */
     publish: booleanish.optional(),
+    progressPercent: z.preprocess(
+      (value) => (value === '' || value === null ? null : value === undefined ? undefined : Number(value)),
+      z.number().int().min(0).max(100).nullable().optional(),
+    ),
+    expectedCompletionDate: z.union([dateField, z.null()]).optional(),
+  })
+  .strict();
+
+export const reportSuggestion = z.object({ reason: reportReasonField }).strict();
+
+export const selectMonthlyIdea = z
+  .object({
+    suggestionId: z.preprocess(
+      (value) => (value === '' || value === null ? null : value),
+      z.union([z.coerce.number().int().positive(), z.null()]),
+    ),
   })
   .strict();
 
@@ -171,25 +198,6 @@ export const moderationUpdate = z
     moderationNote: optionalText(LIMITS.moderationNoteMax),
   })
   .strict();
-
-export const adminUpdateSuggestion = z
-  .object({
-    title: text(LIMITS.titleMax, LIMITS.titleMin).optional(),
-    description: longText(LIMITS.descriptionMax, LIMITS.descriptionMin).optional(),
-    category: categoryField.optional(),
-    location: optionalText(LIMITS.locationMax),
-    extraInfo: optionalText(LIMITS.extraInfoMax),
-    authorName: optionalText(LIMITS.authorNameMax),
-    moderationNote: optionalText(LIMITS.moderationNoteMax),
-  })
-  .strict();
-
-/** Vide / absent = champ inchange (l'admin ne veut pas tout reecrire). */
-export const adminUpdateSuggestionPatch = adminUpdateSuggestion
-  .partial()
-  .refine((data) => Object.keys(data).length > 0, {
-    message: 'Aucune modification fournie.',
-  });
 
 // ---------------------------------------------------------------------------
 // Listes paginees
@@ -222,6 +230,11 @@ export const adminListQuery = publicListQuery.extend({
   sort: canonicalEnum(['recent', 'oldest', 'supported', 'updated', 'status']).optional(),
 });
 
+export const moderationQueueQuery = z.object({
+  page: positiveInt(1, 10_000),
+  limit: positiveInt(30, LIMITS.adminPageSizeMax),
+});
+
 export const adminLogQuery = z.object({
   page: positiveInt(1, 10_000),
   limit: positiveInt(30, LIMITS.adminPageSizeMax),
@@ -247,10 +260,12 @@ export const schemas = Object.freeze({
   trackingRequest,
   adminLogin,
   updateStatus,
+  reportSuggestion,
+  selectMonthlyIdea,
   moderationUpdate,
-  adminUpdateSuggestion: adminUpdateSuggestionPatch,
   publicListQuery,
   adminListQuery,
+  moderationQueueQuery,
   adminLogQuery,
 });
 

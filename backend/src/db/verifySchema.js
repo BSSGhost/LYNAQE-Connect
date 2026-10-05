@@ -10,6 +10,7 @@ import {
   SUGGESTION_STATUSES,
   CATEGORIES,
   VISIBILITIES,
+  REPORT_REASONS,
   MODERATION_ACTIONS,
   UPDATE_EVENT_TYPES,
 } from '../../../shared/constants.js';
@@ -40,6 +41,7 @@ export const ENUM_CONTRACTS = Object.freeze([
   { table: 'moderation_logs', column: 'new_status', expected: SUGGESTION_STATUSES },
   { table: 'moderation_logs', column: 'old_visibility', expected: VISIBILITIES },
   { table: 'moderation_logs', column: 'new_visibility', expected: VISIBILITIES },
+  { table: 'suggestion_reports', column: 'reason', expected: REPORT_REASONS },
 ].map(Object.freeze));
 
 /** Tables attendues. */
@@ -49,6 +51,7 @@ export const REQUIRED_TABLES = Object.freeze([
   'supports',
   'moderation_logs',
   'suggestion_photos',
+  'suggestion_reports',
   'schema_migrations',
 ]);
 
@@ -59,11 +62,14 @@ export const REQUIRED_INDEXES = Object.freeze({
   'suggestions.idx_suggestions_visibility_status': 'visibility,status',
   'suggestions.idx_suggestions_status': 'status',
   'suggestions.idx_suggestions_category': 'category',
+  'suggestions.idx_suggestions_monthly_idea': 'monthly_idea_at',
   'suggestion_updates.idx_updates_suggestion_created': 'suggestion_id,created_at,id',
   'supports.uq_supports_suggestion_supporter': 'suggestion_id,supporter_hash',
   'moderation_logs.idx_logs_suggestion': 'suggestion_id,created_at',
   'suggestion_photos.uq_suggestion_photos_stored_name': 'stored_name',
   'suggestion_photos.idx_suggestion_photos_suggestion': 'suggestion_id,id',
+  'suggestion_reports.uq_suggestion_reports_reporter': 'suggestion_id,reporter_hash',
+  'suggestion_reports.idx_suggestion_reports_suggestion': 'suggestion_id,created_at,id',
   'supports.PRIMARY': 'id',
   'moderation_logs.PRIMARY': 'id',
   'suggestion_updates.PRIMARY': 'id',
@@ -84,6 +90,9 @@ export const REQUIRED_SUGGESTION_COLUMNS = Object.freeze([
   'visibility',
   'created_at',
   'updated_at',
+  'monthly_idea_at',
+  'progress_percent',
+  'expected_completion_date',
 ]);
 
 /**
@@ -229,6 +238,8 @@ export async function verifySchema(connection) {
     'suggestion_updates.suggestion_id->suggestions.id',
     'supports.suggestion_id->suggestions.id',
     'moderation_logs.suggestion_id->suggestions.id',
+    'suggestion_photos.suggestion_id->suggestions.id',
+    'suggestion_reports.suggestion_id->suggestions.id',
   ];
   for (const fk of REQUIRED_FKS) {
     add(`Relation ${fk}`, fkSet.has(fk));
@@ -236,12 +247,12 @@ export async function verifySchema(connection) {
 
   // --- 7. Etat reel des donnees -------------------------------------------
   const [counts] = await connection.query(
-    'SELECT (SELECT COUNT(*) FROM suggestions) AS suggestions, (SELECT COUNT(*) FROM supports) AS supports, (SELECT COUNT(*) FROM suggestion_updates) AS updates, (SELECT COUNT(*) FROM moderation_logs) AS logs',
+    'SELECT (SELECT COUNT(*) FROM suggestions) AS suggestions, (SELECT COUNT(*) FROM supports) AS supports, (SELECT COUNT(*) FROM suggestion_updates) AS updates, (SELECT COUNT(*) FROM moderation_logs) AS logs, (SELECT COUNT(*) FROM suggestion_reports) AS reports',
   );
   add(
     'Contenu de la base',
     true,
-    `suggestions=${counts[0].suggestions}, soutiens=${counts[0].supports}, evenements=${counts[0].updates}, journaux=${counts[0].logs}`,
+    `suggestions=${counts[0].suggestions}, soutiens=${counts[0].supports}, evenements=${counts[0].updates}, journaux=${counts[0].logs}, signalements=${counts[0].reports}`,
   );
 
   return { ok: checks.every((check) => check.ok), checks };

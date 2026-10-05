@@ -11,7 +11,6 @@
  *   GET    /api/admin/statistics
  *   GET    /api/admin/suggestions
  *   GET    /api/admin/suggestions/:id
- *   PATCH  /api/admin/suggestions/:id
  *   PATCH  /api/admin/suggestions/:id/status
  *   PATCH  /api/admin/suggestions/:id/moderation
  *   GET    /api/admin/suggestions/:id/logs
@@ -40,6 +39,13 @@ adminRouter.param('id', parseIdParam);
 function validatePhotoId(req, res, next) {
   if (!/^[1-9]\d{0,19}$/u.test(req.params.photoId)) {
     return next(notFound('Cette photo n’existe pas.'));
+  }
+  return next();
+}
+
+function validateReportId(req, res, next) {
+  if (!/^[1-9]\d{0,19}$/u.test(req.params.reportId)) {
+    return next(notFound('Ce signalement n’existe pas.'));
   }
   return next();
 }
@@ -112,6 +118,32 @@ adminRouter.get(
   asyncHandler(async (req, res) => ok(res, await getStatistics())),
 );
 
+adminRouter.get(
+  '/queue',
+  adminLimiter,
+  requireAdmin,
+  validateQuery(schemas.moderationQueueQuery, 'Paramètres de file invalides.'),
+  asyncHandler(async (req, res) => {
+    const result = await adminService.getModerationQueue(req.validatedQuery);
+    return ok(res, { counts: result.counts, items: result.items }, {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+    });
+  }),
+);
+
+adminRouter.patch(
+  '/monthly-idea',
+  adminLimiter,
+  requireAdmin,
+  validateBody(schemas.selectMonthlyIdea, 'La sélection de l’idée du mois est invalide.'),
+  asyncHandler(async (req, res) =>
+    ok(res, await adminService.selectMonthlyIdea(req.body.suggestionId, req)),
+  ),
+);
+
 // ---------------------------------------------------------------------------
 // Suggestions
 // ---------------------------------------------------------------------------
@@ -165,13 +197,17 @@ adminRouter.get(
   asyncHandler(async (req, res) => ok(res, await adminService.getSuggestion(req.resourceId))),
 );
 
-adminRouter.patch(
-  '/suggestions/:id',
+adminRouter.delete(
+  '/suggestions/:id/reports/:reportId',
   adminLimiter,
   requireAdmin,
-  validateBody(schemas.adminUpdateSuggestion, 'Modification invalide.'),
+  validateReportId,
   asyncHandler(async (req, res) =>
-    ok(res, await adminService.updateSuggestion(req.resourceId, req.body, req)),
+    ok(res, await adminService.removeSuggestionReport(
+      req.resourceId,
+      req.params.reportId,
+      req,
+    )),
   ),
 );
 

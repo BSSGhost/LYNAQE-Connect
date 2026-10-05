@@ -3,11 +3,11 @@
  */
 
 import { PROJECT, ROUTES, CATEGORY_META } from '../../../../shared/constants.js';
-import { mount } from '../core/dom.js';
+import { mount, esc } from '../core/dom.js';
 import { href } from '../core/router.js';
 import { icon } from '../core/icons.js';
 import { formatNumber } from '../core/format.js';
-import { suggestionsApi } from '../core/api.js';
+import { metaApi, suggestionsApi } from '../core/api.js';
 import { loadingHtml } from '../components/layout.js';
 import { suggestionListHtml } from '../components/suggestions.js';
 
@@ -25,12 +25,23 @@ export async function render() {
 
   let items = [];
   let total = null;
-  try {
-    const result = await suggestionsApi.list({ limit: 6, sort: 'recent' });
-    items = result.data ?? [];
-    total = result.meta?.total ?? null;
-  } catch (error) {
-    items = [];
+  let listError = null;
+  let highlights = { popular: [], monthlyIdea: null };
+  let highlightsError = null;
+  const [listResult, highlightsResult] = await Promise.allSettled([
+    suggestionsApi.list({ limit: 6, sort: 'recent' }),
+    metaApi.highlights(),
+  ]);
+  if (listResult.status === 'fulfilled') {
+    items = listResult.value.data ?? [];
+    total = listResult.value.meta?.total ?? null;
+  } else {
+    listError = listResult.reason?.message ?? 'Impossible de charger les suggestions.';
+  }
+  if (highlightsResult.status === 'fulfilled') {
+    highlights = highlightsResult.value.data ?? highlights;
+  } else {
+    highlightsError = highlightsResult.reason?.message ?? 'Impossible de charger les tendances.';
   }
 
   const steps = STEPS.map(
@@ -52,12 +63,39 @@ export async function render() {
 
   const latest = items.length
     ? suggestionListHtml(items)
-    : `<div class="state-block state-empty">
+    : listError
+      ? `<div class="state-block state-error" role="alert"><h2>Suggestions indisponibles</h2><p>${esc(listError)}</p></div>`
+      : `<div class="state-block state-empty">
         ${icon('inbox', { size: 36 })}
         <h2>Rien à afficher</h2>
         <p>${PROJECT.emptyStateMessage}</p>
         <a class="btn btn-primary" href="${href(ROUTES.submit)}">${icon('plus', { size: 16 })} ${PROJECT.emptyStateCta}</a>
       </div>`;
+
+  const monthlyIdea = highlights.monthlyIdea
+    ? `<section class="monthly-idea-card">
+        <div class="monthly-idea-mark">${icon('trophy', { size: 22 })}<span>Idée du mois</span></div>
+        <a href="${href(`${ROUTES.suggestions}/${Number(highlights.monthlyIdea.id)}`)}"><h3>${esc(highlights.monthlyIdea.title)}</h3></a>
+        <p>${esc(highlights.monthlyIdea.description)}</p>
+        <div class="monthly-idea-meta">${icon('thumbsUp', { size: 16 })} ${formatNumber(highlights.monthlyIdea.supportCount)} soutien${highlights.monthlyIdea.supportCount === 1 ? '' : 's'}
+          <a href="${href(`${ROUTES.suggestions}/${highlights.monthlyIdea.id}`)}">Découvrir</a></div>
+      </section>`
+    : '';
+  const popularIdeas = highlights.popular.length
+    ? `<ol class="popular-ideas-list">${highlights.popular.map((idea) => `
+        <li><a href="${href(`${ROUTES.suggestions}/${Number(idea.id)}`)}">${esc(idea.title)}</a>
+          <span>${icon('thumbsUp', { size: 15 })} ${formatNumber(idea.supportCount)} soutien${idea.supportCount === 1 ? '' : 's'}</span></li>
+      `).join('')}</ol>`
+    : '<p class="field-hint">Les idées les plus soutenues apparaîtront ici après leur publication.</p>';
+  const highlightsSection = highlightsError
+    ? `<section class="container section" role="alert"><p class="notice notice-warning">Tendances indisponibles : ${esc(highlightsError)}</p></section>`
+    : `<section class="container section home-highlights">
+        ${monthlyIdea}
+        <div class="popular-ideas-panel">
+          <div class="section-head"><h2 class="section-title">${icon('chart', { size: 20 })} Idées populaires</h2><a class="link-more" href="${href(ROUTES.suggestions)}">Toutes les idées</a></div>
+          ${popularIdeas}
+        </div>
+      </section>`;
 
   mount(
     main,
@@ -113,6 +151,8 @@ export async function render() {
       <h2 class="section-title">Les catégories</h2>
       <div class="category-grid">${categories}</div>
     </section>
+
+    ${highlightsSection}
 
     <section class="container section">
       <div class="section-head">

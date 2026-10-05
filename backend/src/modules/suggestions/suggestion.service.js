@@ -30,6 +30,9 @@ import {
   findPublicSuggestionById,
   addSupportOnce,
   removeSupportOnce,
+  findReportableSuggestion,
+  reportSuggestionOnce,
+  fetchPublicHighlights,
   insertModerationLog,
 } from './suggestion.repository.js';
 import { toOwnerSuggestion, toPublicSuggestion, toSuggestionUpdate } from './suggestion.serializer.js';
@@ -131,6 +134,27 @@ export async function getPublicSuggestion(id) {
     throw notFound('Cette suggestion n’est pas disponible.');
   }
   return toPublicSuggestion(row);
+}
+
+/** Highlights publics réels : classements de soutiens et idée sélectionnée ce mois-ci. */
+export async function getPublicHighlights() {
+  const { popular, monthlyIdea } = await fetchPublicHighlights(3);
+  return {
+    popular: popular.map(toPublicSuggestion),
+    monthlyIdea: monthlyIdea ? toPublicSuggestion(monthlyIdea) : null,
+  };
+}
+
+/** Un appareil peut signaler une suggestion publique une seule fois. */
+export async function reportSuggestion(id, reason, req) {
+  const suggestion = await findReportableSuggestion(id);
+  if (!suggestion) throw notFound('Cette suggestion n’est pas disponible.');
+  const reporterHash = computeSupporterHash({
+    supporterToken: req.supporterToken,
+    ipMasked: req.clientIpMasked,
+    userAgent: req.userAgent,
+  });
+  return reportSuggestionOnce({ suggestionId: suggestion.id, reporterHash, reason });
 }
 
 /**

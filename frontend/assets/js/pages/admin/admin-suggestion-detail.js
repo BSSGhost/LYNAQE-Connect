@@ -16,7 +16,7 @@ import { adminApi } from '../../core/api.js';
 import { formatDateTime, formatNumber, pluralize } from '../../core/format.js';
 import { toast, confirmDialog } from '../../core/ui.js';
 import { loadingHtml } from '../../components/layout.js';
-import { statusBadge, categoryTag, progressStepsHtml, timelineHtml, moderationLogHtml } from '../../components/suggestions.js';
+import { statusBadge, categoryTag, progressStepsHtml, completionPlanHtml, timelineHtml, moderationLogHtml } from '../../components/suggestions.js';
 import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
 
@@ -37,7 +37,7 @@ export async function render(context) {
       `${sidebarHtml(ROUTES.adminSuggestions)}${adminNavHtml(ROUTES.adminSuggestions)}${detailHtml(data)}`,
     );
     wireAdminBar(() => logoutAdmin());
-    wireActions(main, data.suggestion);
+    wireActions(main, data.suggestion, () => render(context));
     wirePhotoGallery(main, data.suggestion.id, data.photos ?? []);
   } catch (error) {
     handleAdminError(error);
@@ -95,6 +95,7 @@ function detailHtml(data) {
         ${location}
         ${extraInfo}
         ${photosHtml(data.photos ?? [])}
+        ${reportsHtml(data.reports ?? [], s.reportCount ?? 0)}
         <div id="photo-viewer-root"></div>
 
         <section class="panel admin-actions-panel">
@@ -111,6 +112,10 @@ function detailHtml(data) {
             <div class="admin-action-editor" id="status-editor" hidden>
               <div class="field"><label for="status-select">Nouveau statut</label><select id="status-select">${statusOptions}</select></div>
               <div class="field checkbox"><input id="status-publish" type="checkbox" ${s.visibility === 'publique' ? 'checked' : ''} /><label for="status-publish">Publier avec le changement de statut</label></div>
+              <div class="admin-progress-fields" id="admin-progress-fields" ${s.status === 'En cours' ? '' : 'hidden'}>
+                <div class="field"><label for="progress-percent">Avancement déclaré (%)</label><input id="progress-percent" type="number" min="0" max="100" step="1" value="${s.progressPercent ?? ''}" placeholder="Ex. 80" /></div>
+                <div class="field"><label for="expected-completion-date">Date prévue de réalisation</label><input id="expected-completion-date" type="date" value="${esc(s.expectedCompletionDate ?? '')}" /></div>
+              </div>
             </div>
           </div>
 
@@ -128,8 +133,8 @@ function detailHtml(data) {
           </div>
 
           <div class="admin-action-field">
-            <label for="status-message">Message public</label>
-            <textarea id="status-message" rows="2" maxlength="${LIMITS.adminMessageMax}" placeholder="Ajouter un message destiné à l'auteur…"></textarea>
+            <label for="status-message">Réponse officielle à l’auteur</label>
+            <textarea id="status-message" rows="2" maxlength="${LIMITS.adminMessageMax}" placeholder="Écrire une réponse visible dans le suivi de l’auteur…"></textarea>
           </div>
           <div class="admin-action-field">
             <label for="moderation-note">Note interne</label>
@@ -140,6 +145,7 @@ function detailHtml(data) {
             <button class="btn btn-outline btn-sm" type="button" id="apply-status">${icon('check', { size: 16 })} Enregistrer le statut</button>
             <button class="btn btn-outline btn-sm" type="button" id="apply-moderation">${icon('shieldCheck', { size: 16 })} Enregistrer la modération</button>
           </div>
+          ${s.visibility === 'publique' ? `<button class="btn btn-outline btn-sm monthly-idea-action" type="button" data-monthly-idea>${icon('trophy', { size: 16 })} ${s.isMonthlyIdea ? 'Retirer l’idée du mois' : 'Choisir comme idée du mois'}</button>` : ''}
           <button class="btn btn-outline btn-sm danger admin-delete-action" type="button" data-action="delete" data-title="${esc(s.title)}">${icon('trash', { size: 16 })} Supprimer la suggestion</button>
         </section>
 
@@ -160,7 +166,8 @@ function detailHtml(data) {
       <aside class="admin-detail-side">
         <section class="panel">
           <h2>Progression</h2>
-          ${progressStepsHtml(s.status)}
+          ${progressStepsHtml(s.status, data.timeline)}
+          ${completionPlanHtml(s)}
           <p class="field-hint">${esc(s.statusInfo?.description ?? '')}</p>
         </section>
       </aside>
@@ -185,6 +192,20 @@ function photosHtml(photos) {
       <h2 id="admin-photos-title">${icon('camera', { size: 18 })} Photos jointes</h2>
       ${items}
     </section>`;
+}
+
+function reportsHtml(reports, count) {
+  const items = reports.length
+    ? `<ul class="admin-report-list">${reports.map((report) => `
+        <li data-report="${esc(report.id)}">
+          <span><strong>${esc(report.reason)}</strong><small>${esc(formatDateTime(report.createdAt))}</small></span>
+          <button class="btn btn-ghost btn-sm danger" type="button" data-remove-report="${esc(report.id)}" aria-label="Retirer le signalement ${esc(report.reason)}">${icon('trash', { size: 15 })} Traité</button>
+        </li>`).join('')}</ul>`
+    : '<p class="admin-photo-empty">Aucun signalement pour cette suggestion.</p>';
+  return `<section class="panel admin-reports-panel">
+    <h2>${icon('alert', { size: 18 })} Signalements <span class="report-count" data-report-count>${formatNumber(count)}</span></h2>
+    ${items}
+  </section>`;
 }
 
 function wirePhotoGallery(main, suggestionId, photos) {
@@ -310,7 +331,13 @@ function openPhotoViewer(root, photoUrls, initialIndex, trigger) {
   };
 }
 
-function wireActions(main, suggestion) {
+function wireActions(main, suggestion, refresh) {
+  const statusSelect = main.querySelector('#status-select');
+  const progressFields = main.querySelector('#admin-progress-fields');
+  statusSelect?.addEventListener('change', () => {
+    progressFields.hidden = statusSelect.value !== 'En cours';
+  });
+
   main.querySelectorAll('[data-edit-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
       const editor = main.querySelector(`#${button.getAttribute('aria-controls')}`);
@@ -323,15 +350,72 @@ function wireActions(main, suggestion) {
   });
 
   main.querySelector('#apply-status').addEventListener('click', async () => {
+    const button = main.querySelector('#apply-status');
     const status = main.querySelector('#status-select').value;
     const message = main.querySelector('#status-message').value.trim();
     const publish = main.querySelector('#status-publish').checked;
+    const progressPercent = main.querySelector('#progress-percent')?.value;
+    const expectedCompletionDate = main.querySelector('#expected-completion-date')?.value;
+    button.disabled = true;
     try {
-      await adminApi.changeStatus(suggestion.id, { status, message: message || undefined, publish });
+      await adminApi.changeStatus(suggestion.id, {
+        status,
+        message: message || undefined,
+        publish,
+        ...(status === 'En cours'
+          ? {
+              progressPercent: progressPercent === '' ? null : Number(progressPercent),
+              expectedCompletionDate: expectedCompletionDate || null,
+            }
+          : {}),
+      });
       toast(`Statut mis à jour : ${status}.`, 'success');
+      await refresh();
     } catch (error) {
       handleAdminError(error);
+    } finally {
+      button.disabled = false;
     }
+  });
+
+  main.querySelector('[data-monthly-idea]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const nextValue = !suggestion.isMonthlyIdea;
+      await adminApi.selectMonthlyIdea(nextValue ? suggestion.id : null);
+      suggestion.isMonthlyIdea = nextValue;
+      button.innerHTML = `${icon('trophy', { size: 16 })} ${nextValue ? 'Retirer l’idée du mois' : 'Choisir comme idée du mois'}`;
+      toast(nextValue ? 'Cette suggestion est l’idée du mois.' : 'Idée du mois retirée.', 'success');
+    } catch (error) {
+      handleAdminError(error);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  main.querySelectorAll('[data-remove-report]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const reportId = button.getAttribute('data-remove-report');
+      button.disabled = true;
+      try {
+        const { data } = await adminApi.removeReport(suggestion.id, reportId);
+        main.querySelector(`[data-report="${reportId}"]`)?.remove();
+        const count = main.querySelector('[data-report-count]');
+        if (count) count.textContent = formatNumber(data.reportCount);
+        if (data.reportCount === 0) {
+          const list = main.querySelector('.admin-report-list');
+          list?.replaceWith(Object.assign(document.createElement('p'), {
+            className: 'admin-photo-empty',
+            textContent: 'Aucun signalement pour cette suggestion.',
+          }));
+        }
+        toast('Signalement marqué comme traité.', 'success');
+      } catch (error) {
+        handleAdminError(error);
+        button.disabled = false;
+      }
+    });
   });
 
   main.querySelector('#apply-moderation').addEventListener('click', async () => {

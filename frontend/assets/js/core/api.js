@@ -127,6 +127,7 @@ export const api = {
 export const metaApi = {
   info: () => api.get('/meta'),
   health: () => api.get('/health'),
+  highlights: () => api.get('/highlights'),
 };
 
 export const suggestionsApi = {
@@ -138,6 +139,7 @@ export const suggestionsApi = {
     method: 'POST',
     body: payload,
   }),
+  report: (id, reason) => api.post(`/suggestions/${id}/reports`, { reason }),
   support: (id) => api.post(`/suggestions/${id}/support`),
   unsupport: (id) => api.delete(`/suggestions/${id}/support`),
 };
@@ -151,6 +153,9 @@ export const adminApi = {
   session: () => api.get('/admin/session', { auth: true }),
   logout: () => api.post('/admin/logout', undefined, { auth: true }),
   statistics: () => api.get('/admin/statistics', { auth: true }),
+  queue: (query) => api.get('/admin/queue', { auth: true, query }),
+  selectMonthlyIdea: (suggestionId) =>
+    api.patch('/admin/monthly-idea', { suggestionId }, { auth: true }),
   suggestions: (query) => api.get('/admin/suggestions', { auth: true, query }),
   suggestion: (id) => api.get(`/admin/suggestions/${id}`, { auth: true }),
   photo: (suggestionId, photoId, options) =>
@@ -158,13 +163,13 @@ export const adminApi = {
       ...options,
       auth: true,
     }),
-  updateSuggestion: (id, payload) =>
-    api.patch(`/admin/suggestions/${id}`, payload, { auth: true }),
   changeStatus: (id, payload) =>
     api.patch(`/admin/suggestions/${id}/status`, payload, { auth: true }),
   moderate: (id, payload) =>
     api.patch(`/admin/suggestions/${id}/moderation`, payload, { auth: true }),
   remove: (id) => api.delete(`/admin/suggestions/${id}`, { auth: true }),
+  removeReport: (suggestionId, reportId) =>
+    api.delete(`/admin/suggestions/${suggestionId}/reports/${reportId}`, { auth: true }),
   logs: (query) => api.get('/admin/logs', { auth: true, query }),
   logsForSuggestion: (id) => api.get(`/admin/suggestions/${id}/logs`, { auth: true }),
 };

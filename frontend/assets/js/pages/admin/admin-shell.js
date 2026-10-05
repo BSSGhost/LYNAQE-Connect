@@ -15,6 +15,7 @@ import { toast } from '../../core/ui.js';
 import { esc } from '../../core/dom.js';
 
 const SIDEBAR_ITEMS = [
+  { path: ROUTES.adminQueue, label: 'À traiter', icon: 'inbox' },
   { path: ROUTES.adminSuggestions, label: 'Suggestions', icon: 'list' },
   { path: ROUTES.adminStatistics, label: 'Statistiques', icon: 'chart' },
   { path: ROUTES.adminLogs, label: 'Journal', icon: 'journal' },

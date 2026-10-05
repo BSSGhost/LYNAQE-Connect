@@ -65,17 +65,35 @@ export function suggestionListHtml(items, options = {}) {
 }
 
 /** Barre d'étapes En attente → Reçue → À l'étude → En cours → Réalisée. */
-export function progressStepsHtml(currentStatus) {
+export function progressStepsHtml(currentStatus, events = []) {
   const currentMeta = getStatusMeta(currentStatus);
   const currentStep = currentMeta?.step ?? null;
 
   const steps = PROGRESS_STATUSES.map((status) => {
     const meta = getStatusMeta(status);
     const state = currentStep === null ? '' : meta.step < currentStep ? 'is-done' : meta.step === currentStep ? 'is-current' : '';
-    return `<li class="${state}"><span class="step-dot"></span>${esc(status)}</li>`;
+    const event = events.find((item) => item.newStatus === status);
+    const date = event?.createdAt
+      ? `<span class="progress-step-date">${state === 'is-current' ? 'Depuis le ' : ''}${esc(formatDate(event.createdAt))}</span>`
+      : '';
+    return `<li class="${state}"><span class="step-dot"></span><span class="progress-step-label">${esc(status)}</span>${date}</li>`;
   }).join('');
 
   return `<ul class="progress-steps" aria-label="Progression">${steps}</ul>`;
+}
+
+export function completionPlanHtml(suggestion) {
+  if (suggestion.status !== 'En cours') return '';
+  const percent = suggestion.progressPercent;
+  const date = suggestion.expectedCompletionDate;
+  if ((percent === null || percent === undefined) && !date) return '';
+  return `<section class="completion-plan" aria-label="Avancement de la réalisation">
+    <h3>Avancement</h3>
+    ${percent !== null && percent !== undefined ? `<div class="completion-progress" role="progressbar" aria-label="Avancement déclaré par l’administration" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Number(percent)}">
+      <span style="width:${Math.max(0, Math.min(100, Number(percent)))}%"></span>
+    </div><p class="completion-percent">${formatNumber(percent)} %</p>` : ''}
+    ${date ? `<p class="completion-date">${icon('calendar', { size: 15 })} Date prévue : <strong>${esc(formatDate(date))}</strong></p>` : ''}
+  </section>`;
 }
 
 function timelineIcon(eventType) {
@@ -110,6 +128,7 @@ export function timelineHtml(events) {
           <span class="timeline-marker ${isLast ? 'is-current' : ''}">${icon(timelineIcon(event.eventType), { size: 12 })}</span>
           <p class="timeline-title">${esc(title)}</p>
           <span class="timeline-time">${esc(formatDateTime(event.createdAt))}</span>
+          ${event.message && event.authorType === 'admin' ? '<p class="timeline-official-label">Réponse de l’administration</p>' : ''}
           ${event.message ? `<p class="timeline-message">${esc(event.message)}</p>` : `<p class="field-hint">${esc(description)}</p>`}
         </li>
       `;

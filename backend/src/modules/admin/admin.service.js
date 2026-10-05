@@ -11,7 +11,7 @@
  */
 
 import { transaction, query, queryOne } from '../../config/db.js';
-import { notFound, conflict } from '../../utils/errors.js';
+import { notFound, validationError } from '../../utils/errors.js';
 import { toAdminSuggestion, toSuggestionUpdate, toModerationLog } from '../suggestions/suggestion.serializer.js';
 import {
   findSuggestionByIdForAdmin,
@@ -22,6 +22,8 @@ import {
   listSuggestionModerationLogs,
   listSuggestionUpdates,
   listModerationLogs,
+  listSuggestionReports,
+  fetchModerationQueue,
 } from '../suggestions/suggestion.repository.js';
 import {
   getAdminPhotoFile,
@@ -57,19 +59,30 @@ export async function listSuggestions(filters) {
   return { ...result, items: result.rows.map(toAdminSuggestion) };
 }
 
+export async function getModerationQueue(filters) {
+  const result = await fetchModerationQueue(filters);
+  return { ...result, items: result.rows.map(toAdminSuggestion) };
+}
+
 /** Detail complet : suggestion + timeline + journal de moderation. */
 export async function getSuggestion(id) {
   const row = await loadOrFail(id);
-  const [timeline, logs, photos] = await Promise.all([
+  const [timeline, logs, photos, reports] = await Promise.all([
     listSuggestionUpdates(row.id),
     listSuggestionModerationLogs(row.id),
     listSuggestionPhotos(row.id),
+    listSuggestionReports(row.id),
   ]);
   return {
     suggestion: toAdminSuggestion(row),
     timeline: timeline.map(toSuggestionUpdate),
     moderationLogs: logs.map(toModerationLog),
     photos,
+    reports: reports.map((report) => ({
+      id: String(report.id),
+      reason: report.reason,
+      createdAt: report.created_at instanceof Date ? report.created_at.toISOString() : report.created_at,
+    })),
   };
 }
 
@@ -88,7 +101,8 @@ export function getSuggestionPhotoFile(suggestionId, photoId) {
 export async function changeStatus(id, input, ctx) {
   return transaction(async (connection) => {
     const [rows] = await connection.execute(
-      'SELECT id, status, visibility, published_at FROM suggestions WHERE id = ?',
+      `SELECT id, status, visibility, published_at, progress_percent, expected_completion_date
+         FROM suggestions WHERE id = ?`,
       [id],
     );
     if (rows.length === 0) throw notFound('Cette suggestion n’existe pas.');
@@ -98,14 +112,38 @@ export async function changeStatus(id, input, ctx) {
     const oldVisibility = current.visibility;
 
     const newStatus = input.status;
+    if (
+      newStatus !== 'En cours' &&
+      (input.progressPercent !== undefined || input.expectedCompletionDate !== undefined)
+    ) {
+      throw validationError('Le pourcentage et la date prévue ne peuvent être définis que pour une suggestion « En cours ».');
+    }
     // `publish` est optionnel : absent = la visibilite ne change pas.
     const newVisibility =
       input.publish === undefined ? oldVisibility : input.publish ? 'publique' : 'privee';
 
     const statusChanged = newStatus !== oldStatus;
     const visibilityChanged = newVisibility !== oldVisibility;
+    const newProgressPercent =
+      newStatus === 'En cours'
+        ? input.progressPercent === undefined
+          ? current.progress_percent
+          : input.progressPercent
+        : null;
+    const newCompletionDate =
+      newStatus === 'En cours'
+        ? input.expectedCompletionDate === undefined
+          ? current.expected_completion_date
+          : input.expectedCompletionDate
+        : null;
+    const progressChanged =
+      newProgressPercent !== current.progress_percent ||
+      String(newCompletionDate ?? '') !==
+        String(current.expected_completion_date instanceof Date
+          ? current.expected_completion_date.toISOString().slice(0, 10)
+          : current.expected_completion_date ?? '');
 
-    if (!statusChanged && !visibilityChanged && !input.message) {
+    if (!statusChanged && !visibilityChanged && !input.message && !progressChanged) {
       return { suggestion: await loadInTransaction(connection, id), changed: false };
     }
 
@@ -118,9 +156,10 @@ export async function changeStatus(id, input, ctx) {
     await connection.execute(
       `UPDATE suggestions
           SET status = ?, visibility = ?, published_at = ?,
+              progress_percent = ?, expected_completion_date = ?,
               updated_at = CURRENT_TIMESTAMP
         WHERE id = ?`,
-      [newStatus, newVisibility, publishedAt, id],
+      [newStatus, newVisibility, publishedAt, newProgressPercent, newCompletionDate, id],
     );
 
     // --- Timeline ---------------------------------------------------------
@@ -128,26 +167,35 @@ export async function changeStatus(id, input, ctx) {
       ? newVisibility === 'publique'
         ? 'publication'
         : 'message'
-      : 'statut';
+      : statusChanged
+        ? 'statut'
+        : progressChanged
+          ? 'modification'
+          : 'message';
+    const publicMessage =
+      input.message ??
+      (progressChanged && !statusChanged && !visibilityChanged
+        ? 'Le plan de réalisation a été mis à jour.'
+        : null);
 
     await insertSuggestionUpdate(connection, {
       suggestionId: id,
       eventType,
       oldStatus: statusChanged ? oldStatus : null,
       newStatus: statusChanged ? newStatus : null,
-      publicMessage: input.message ?? null,
+      publicMessage,
       authorType: 'admin',
     });
 
     // --- Journal de moderation --------------------------------------------
     await insertModerationLog(connection, {
       suggestionId: id,
-      action: 'statut',
+      action: statusChanged || visibilityChanged || input.message ? 'statut' : 'modification',
       oldStatus,
       newStatus,
       oldVisibility,
       newVisibility,
-      note: input.message ?? null,
+      note: input.message ?? (progressChanged ? 'Plan de réalisation mis à jour.' : null),
       ...audit(ctx),
     });
 
@@ -176,6 +224,84 @@ export async function changeStatus(id, input, ctx) {
     }
 
     return { suggestion: await loadInTransaction(connection, id), changed: true };
+  });
+}
+
+/** Désigne (ou retire) l’idée du mois courant, sans conserver de sélection ancienne. */
+export async function selectMonthlyIdea(suggestionId, ctx) {
+  return transaction(async (connection) => {
+    // Lock the suggestion rows in primary-key order so concurrent admin
+    // selections serialize before clearing and replacing the current idea.
+    await connection.execute('SELECT id FROM suggestions ORDER BY id FOR UPDATE');
+    let selected = null;
+    if (suggestionId !== null) {
+      const [rows] = await connection.execute(
+        'SELECT id, status, visibility FROM suggestions WHERE id = ? FOR UPDATE',
+        [suggestionId],
+      );
+      if (rows.length === 0 || rows[0].visibility !== 'publique') {
+        throw notFound('Seule une suggestion publiée peut être choisie comme idée du mois.');
+      }
+      selected = rows[0];
+    }
+
+    const [current] = await connection.execute(
+      `SELECT id, status, visibility FROM suggestions
+        WHERE monthly_idea_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+          AND monthly_idea_at < DATE_FORMAT(CURDATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+        FOR UPDATE`,
+    );
+    await connection.execute('UPDATE suggestions SET monthly_idea_at = NULL WHERE monthly_idea_at IS NOT NULL');
+    if (selected) {
+      await connection.execute('UPDATE suggestions SET monthly_idea_at = CURRENT_TIMESTAMP WHERE id = ?', [
+        selected.id,
+      ]);
+    }
+    const auditedSuggestion = selected ?? current[0] ?? null;
+    await insertModerationLog(connection, {
+      suggestionId: auditedSuggestion?.id ?? null,
+      action: 'modification',
+      oldStatus: auditedSuggestion?.status ?? null,
+      newStatus: auditedSuggestion?.status ?? null,
+      oldVisibility: auditedSuggestion?.visibility ?? null,
+      newVisibility: auditedSuggestion?.visibility ?? null,
+      note: selected ? 'Suggestion choisie comme idée du mois.' : 'Idée du mois retirée.',
+      ...audit(ctx),
+    });
+    return { suggestionId: selected ? Number(selected.id) : null };
+  });
+}
+
+export async function removeSuggestionReport(suggestionId, reportId, ctx) {
+  return transaction(async (connection) => {
+    const [rows] = await connection.execute(
+      `SELECT s.status, s.visibility, r.reason
+         FROM suggestion_reports r
+         JOIN suggestions s ON s.id = r.suggestion_id
+        WHERE r.suggestion_id = ? AND r.id = ?
+        FOR UPDATE`,
+      [suggestionId, reportId],
+    );
+    if (!rows.length) throw notFound('Ce signalement n’existe pas.');
+    await connection.execute(
+      'DELETE FROM suggestion_reports WHERE suggestion_id = ? AND id = ?',
+      [suggestionId, reportId],
+    );
+    await insertModerationLog(connection, {
+      suggestionId,
+      action: 'modification',
+      oldStatus: rows[0].status,
+      newStatus: rows[0].status,
+      oldVisibility: rows[0].visibility,
+      newVisibility: rows[0].visibility,
+      note: `Signalement examiné et retiré (${rows[0].reason}).`,
+      ...audit(ctx),
+    });
+    const [countRows] = await connection.execute(
+      'SELECT COUNT(*) AS count FROM suggestion_reports WHERE suggestion_id = ?',
+      [suggestionId],
+    );
+    return { removed: true, reportCount: Number(countRows[0].count) };
   });
 }
 
@@ -240,63 +366,6 @@ export async function setModeration(id, input, ctx) {
         ...audit(ctx),
       });
     }
-
-    return { suggestion: await loadInTransaction(connection, id) };
-  });
-}
-
-/** Modifie le contenu d'une suggestion (titre, description, categorie...). */
-export async function updateSuggestion(id, patch, ctx) {
-  return transaction(async (connection) => {
-    const row = await findAdminSuggestionByIdIn(connection, id);
-    if (!row) throw notFound('Cette suggestion n’existe pas.');
-
-    const columnByField = {
-      title: 'title',
-      description: 'description',
-      category: 'category',
-      location: 'location',
-      extraInfo: 'extra_info',
-      authorName: 'author_name',
-      moderationNote: 'moderation_note',
-    };
-
-    const assignments = [];
-    const params = [];
-    for (const [field, column] of Object.entries(columnByField)) {
-      if (patch[field] === undefined) continue;
-      assignments.push(`${column} = ?`);
-      params.push(patch[field] ?? null);
-    }
-
-    if (assignments.length === 0) {
-      throw conflict('Aucune modification exploitable.');
-    }
-
-    assignments.push('updated_at = CURRENT_TIMESTAMP');
-    params.push(id);
-
-    await connection.execute(`UPDATE suggestions SET ${assignments.join(', ')} WHERE id = ?`, params);
-
-    await insertSuggestionUpdate(connection, {
-      suggestionId: id,
-      eventType: 'modification',
-      oldStatus: null,
-      newStatus: null,
-      publicMessage: 'La suggestion a été mise à jour par la modération.',
-      authorType: 'admin',
-    });
-
-    await insertModerationLog(connection, {
-      suggestionId: id,
-      action: 'modification',
-      oldStatus: row.status,
-      newStatus: row.status,
-      oldVisibility: row.visibility,
-      newVisibility: row.visibility,
-      note: patch.moderationNote ?? `Champs modifies : ${Object.keys(patch).join(', ')}.`,
-      ...audit(ctx),
-    });
 
     return { suggestion: await loadInTransaction(connection, id) };
   });

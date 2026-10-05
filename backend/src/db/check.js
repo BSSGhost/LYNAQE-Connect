@@ -69,6 +69,15 @@ async function main() {
     console.log(`  ${icon} ${check.label}${check.detail ? paint.dim(` — ${check.detail}`) : ''}`);
   }
 
+  if (!verification.ok) {
+    heading('Resultat');
+    console.error(
+      `  ${paint.err('Anomalies detectees.')} Appliquez les migrations manquantes avec ${paint.bold('npm run migrate')}, puis relancez ${paint.bold('npm run check')}.`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   heading('Donnees reelles (MySQL)');
   const totals = await query('SELECT COUNT(*) AS total FROM suggestions');
   console.log(`  Suggestions     : ${paint.bold(num(totals[0].total))}`);
@@ -113,7 +122,7 @@ async function main() {
       console.log(`  ${paint.dim('L\'interface affichera « Aucune suggestion pour le moment. »')}`);
     }
   } else {
-    console.error(`  ${paint.err('Anomalies detectees.')} Lancez ${paint.bold('npm run db:reset')} puis ${paint.bold('npm run migrate')}.`);
+    console.error(`  ${paint.err('Anomalies detectees.')} Appliquez les migrations manquantes avec ${paint.bold('npm run migrate')}.`);
     process.exitCode = 1;
   }
 }

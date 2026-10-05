@@ -86,6 +86,13 @@ export const PROGRESS_STATUSES = Object.freeze(
   STATUS_META.filter((s) => s.step !== null).map((s) => s.value)
 );
 
+/** Statuts présents dans la file de modération dédiée. */
+export const MODERATION_QUEUE_STATUSES = Object.freeze([
+  'En attente',
+  'Reçue',
+  'À l’étude',
+]);
+
 export const STATUS_BY_VALUE = Object.freeze(
   Object.fromEntries(STATUS_META.map((s) => [s.value, s]))
 );
@@ -185,6 +192,16 @@ export const VISIBILITY_META = Object.freeze([
 export const VISIBILITIES = Object.freeze(VISIBILITY_META.map((v) => v.value));
 export const DEFAULT_VISIBILITY = 'privee';
 
+/** Motifs de signalement disponibles sur une suggestion publique. */
+export const REPORT_REASONS = Object.freeze([
+  'Contenu offensant',
+  'Spam',
+  'Informations personnelles',
+  'Fausse information',
+  'Contenu inapproprié',
+  'Autre',
+]);
+
 /** Actions tracees dans `moderation_logs`. */
 export const MODERATION_ACTIONS = Object.freeze([
   'creation',
@@ -244,6 +261,7 @@ export const ROUTES = Object.freeze({
   privacy: '/confidentialite',
   admin: '/admin',
   adminSuggestions: '/admin/suggestions',
+  adminQueue: '/admin/a-traiter',
   adminStatistics: '/admin/statistiques',
   adminLogs: '/admin/journal',
   notFound: '/introuvable',

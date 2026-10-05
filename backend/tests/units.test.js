@@ -35,6 +35,7 @@ import {
   DEFAULT_STATUS,
   DEFAULT_VISIBILITY,
   VISIBILITIES,
+  REPORT_REASONS,
   isValidStatus,
   isValidCategory,
   getStatusMeta,
@@ -286,6 +287,36 @@ test('le schema de changement de statut n autorise que les 7 statuts', () => {
   }
   const bad = validate(schemas.updateStatus, { status: 'Terminée' });
   assert.equal(bad.success, false);
+});
+
+test('les motifs de signalement et les dates d’avancement sont valides et stricts', () => {
+  assert.deepEqual(REPORT_REASONS, [
+    'Contenu offensant',
+    'Spam',
+    'Informations personnelles',
+    'Fausse information',
+    'Contenu inapproprié',
+    'Autre',
+  ]);
+  assert.equal(validate(schemas.reportSuggestion, { reason: 'Spam' }).success, true);
+  assert.equal(validate(schemas.reportSuggestion, { reason: 'Autre chose' }).success, false);
+  assert.equal(
+    validate(schemas.updateStatus, {
+      status: 'En cours',
+      progressPercent: 80,
+      expectedCompletionDate: '2026-10-20',
+    }).success,
+    true,
+  );
+  assert.equal(
+    validate(schemas.updateStatus, {
+      status: 'En cours',
+      progressPercent: 101,
+      expectedCompletionDate: '2026-02-30',
+    }).success,
+    false,
+  );
+  assert.equal(validate(schemas.selectMonthlyIdea, { suggestionId: null }).success, true);
 });
 
 test('le schema de connexion admin exige un mot de passe raisonnable', () => {

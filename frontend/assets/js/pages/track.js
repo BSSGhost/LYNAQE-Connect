@@ -13,7 +13,7 @@ import { validateTracking } from '../core/validation.js';
 import { formatTrackingCode } from '../core/format.js';
 import { toast } from '../core/ui.js';
 import { pageHeader, breadcrumbs } from '../components/layout.js';
-import { statusBadge, categoryTag, progressStepsHtml, timelineHtml } from '../components/suggestions.js';
+import { statusBadge, categoryTag, progressStepsHtml, completionPlanHtml, timelineHtml } from '../components/suggestions.js';
 
 export async function render() {
   const main = document.getElementById('main');
@@ -110,7 +110,7 @@ function renderResult(main, data) {
         <span class="meta-item">${icon('eye', { size: 15 })} ${suggestion.visibility === 'publique' ? 'Publiée' : 'Non publiée'}</span>
       </div>
       <div class="detail-block"><h2>Description</h2><p class="preserve">${esc(suggestion.description)}</p></div>
-      <div class="detail-block"><h2>Progression</h2>${progressStepsHtml(suggestion.status)}</div>
+      <div class="detail-block"><h2>Progression</h2>${progressStepsHtml(suggestion.status, data.timeline)}${completionPlanHtml(suggestion)}</div>
       <div class="detail-block"><h2>${icon('history', { size: 18 })} Historique</h2>${timelineHtml(data.timeline)}</div>
       <div class="form-actions">
         <button class="btn btn-outline" type="button" data-action="again">${icon('search', { size: 16 })} Vérifier une autre suggestion</button>

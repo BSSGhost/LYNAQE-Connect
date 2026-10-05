@@ -232,7 +232,7 @@ async function main() {
     console.log(`  ${paint.dim('Prochaine etape : npm start (puis ouvrez http://localhost:3000)')}`);
   } else {
     console.error(`  ${paint.err('Le schema ne correspond pas a la source de verite.')}`);
-    console.error(paint.dim('  Lancez `npm run db:reset` puis `npm run migrate` pour reconstruire.'));
+    console.error(paint.dim('  Verifiez les migrations restantes et appliquez-les avec `npm run migrate`.'));
     process.exitCode = 1;
   }
 }

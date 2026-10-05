@@ -9,7 +9,11 @@
  */
 
 import { query, queryOne, execute, transaction } from '../../config/db.js';
-import { SUGGESTION_STATUSES, CATEGORIES } from '../../../../shared/constants.js';
+import {
+  SUGGESTION_STATUSES,
+  CATEGORIES,
+  MODERATION_QUEUE_STATUSES,
+} from '../../../../shared/constants.js';
 
 /**
  * Chies de tri autorisees -> fragment SQL.
@@ -40,20 +44,27 @@ export function escapeLike(value) {
 const PUBLIC_COLUMNS = `
   s.id, s.title, s.description, s.category, s.location, s.extra_info,
   s.status, s.visibility, s.is_anonymous, s.support_count,
-  s.published_at, s.created_at, s.updated_at
+  s.published_at, s.created_at, s.updated_at, s.progress_percent,
+  s.expected_completion_date, s.monthly_idea_at
 `;
 
 const OWNER_COLUMNS = `
   s.id, s.tracking_code, s.title, s.description, s.category, s.location,
   s.extra_info, s.status, s.visibility, s.is_anonymous, s.author_name,
-  s.author_contact, s.support_count, s.published_at, s.created_at, s.updated_at
+  s.author_contact, s.support_count, s.published_at, s.created_at, s.updated_at,
+  s.progress_percent, s.expected_completion_date, s.monthly_idea_at
 `;
 
 const ADMIN_COLUMNS = `
   s.id, s.tracking_code, s.title, s.description, s.category, s.location,
   s.extra_info, s.status, s.visibility, s.is_anonymous, s.author_name,
   s.author_contact, s.moderation_note, s.support_count, s.published_at,
-  s.created_at, s.updated_at
+  s.created_at, s.updated_at, s.progress_percent, s.expected_completion_date,
+  s.monthly_idea_at,
+  CASE WHEN s.monthly_idea_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+         AND s.monthly_idea_at < DATE_FORMAT(CURDATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+       THEN 1 ELSE 0 END AS is_monthly_idea,
+  (SELECT COUNT(*) FROM suggestion_reports r WHERE r.suggestion_id = s.id) AS report_count
 `;
 
 // ---------------------------------------------------------------------------
@@ -187,6 +198,70 @@ export async function removeSupportOnce({ suggestionId, supporterHash }) {
     );
     return { removed: result.affectedRows > 0, supportCount: Number(rows[0].support_count) };
   });
+}
+
+/** Ajoute un signalement unique par empreinte d'appareil et suggestion. */
+export async function reportSuggestionOnce({ suggestionId, reporterHash, reason }) {
+  try {
+    await execute(
+      `INSERT INTO suggestion_reports (suggestion_id, reporter_hash, reason)
+       VALUES (?, ?, ?)`,
+      [suggestionId, reporterHash, reason],
+    );
+    return { alreadyReported: false };
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') return { alreadyReported: true };
+    throw error;
+  }
+}
+
+export function listSuggestionReports(suggestionId) {
+  return query(
+    `SELECT id, reason, created_at
+       FROM suggestion_reports
+      WHERE suggestion_id = ?
+      ORDER BY created_at DESC, id DESC`,
+    [suggestionId],
+  );
+}
+
+export function deleteSuggestionReport(suggestionId, reportId) {
+  return execute(
+    'DELETE FROM suggestion_reports WHERE suggestion_id = ? AND id = ?',
+    [suggestionId, reportId],
+  );
+}
+
+export function findReportableSuggestion(id) {
+  return queryOne(
+    `SELECT id FROM suggestions
+      WHERE id = ? AND visibility = 'publique'`,
+    [id],
+  );
+}
+
+/** Highlights visibles sur l'accueil : idées populaires et sélection du mois courant. */
+export async function fetchPublicHighlights(limit = 3) {
+  const [popular, monthlyIdea] = await Promise.all([
+    query(
+      `SELECT ${PUBLIC_COLUMNS}
+         FROM suggestions s
+        WHERE s.visibility = 'publique' AND s.support_count > 0
+        ORDER BY s.support_count DESC, s.published_at DESC, s.id DESC
+        LIMIT ?`,
+      [limit],
+    ),
+    queryOne(
+      `SELECT ${PUBLIC_COLUMNS}
+         FROM suggestions s
+        WHERE s.visibility = 'publique'
+          AND s.monthly_idea_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+          AND s.monthly_idea_at < DATE_FORMAT(CURDATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+        ORDER BY s.monthly_idea_at DESC, s.id DESC
+        LIMIT 1`,
+    ),
+  ]);
+  return { popular, monthlyIdea: monthlyIdea ?? null };
 }
 
 /** Retire tous les soutiens d'une suggestion (repli apres suppression). */
@@ -342,6 +417,38 @@ export async function listAdminSuggestions({ page, limit, category, status, visi
   const total = Number(counters?.total ?? 0);
 
   return { rows, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+}
+
+/** Liste et compteurs de la file, limitée aux trois statuts à traiter. */
+export async function fetchModerationQueue({ page, limit }) {
+  const statuses = MODERATION_QUEUE_STATUSES;
+  const counts = await query(
+    `SELECT status, COUNT(*) AS count
+       FROM suggestions
+      WHERE status IN (?, ?, ?)
+      GROUP BY status`,
+    statuses,
+  );
+  const rows = await query(
+    `SELECT ${ADMIN_COLUMNS}
+       FROM suggestions s
+      WHERE s.status IN (?, ?, ?)
+      ORDER BY FIELD(s.status, ?, ?, ?), s.created_at ASC, s.id ASC
+      LIMIT ? OFFSET ?`,
+    [...statuses, ...statuses, limit, (page - 1) * limit],
+  );
+  const total = counts.reduce((sum, row) => sum + Number(row.count), 0);
+  return {
+    counts: Object.fromEntries(statuses.map((status) => [
+      status,
+      Number(counts.find((row) => row.status === status)?.count ?? 0),
+    ])),
+    rows,
+    total,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
 }
 
 export function findAdminSuggestionById(id) {

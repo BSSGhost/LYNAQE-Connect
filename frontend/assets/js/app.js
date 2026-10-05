@@ -26,6 +26,7 @@ import * as notFound from './pages/not-found.js';
 
 import * as adminLogin from './pages/admin/admin-login.js';
 import * as adminSuggestions from './pages/admin/admin-suggestions.js';
+import * as adminQueue from './pages/admin/admin-queue.js';
 import * as adminSuggestionDetail from './pages/admin/admin-suggestion-detail.js';
 import * as adminStatistics from './pages/admin/admin-statistics.js';
 import * as adminLogs from './pages/admin/admin-logs.js';
@@ -55,6 +56,7 @@ function bootstrap() {
     .add(ROUTES.rules, rules.render)
     .add(ROUTES.privacy, privacy.render)
     .add(ROUTES.admin, adminLogin.render)
+    .add(ROUTES.adminQueue, adminQueue.render)
     .add(ROUTES.adminSuggestions, adminSuggestions.render)
     .add(`${ROUTES.adminSuggestions}/:id`, adminSuggestionDetail.render)
     .add(ROUTES.adminStatistics, adminStatistics.render)

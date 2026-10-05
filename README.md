@@ -41,9 +41,11 @@ et chacun peut suivre l’avancement de sa propre suggestion.
   **numéro de suivi** et le **code secret** (affichés une seule fois).
 - **Suggestions** : liste paginée, filtres par catégorie et statut, tri, état vide explicite.
 - **Détail d’une suggestion** : description, progression, historique de modération, bouton de soutien
-  (un soutien par appareil, le serveur faisant autorité), partage du lien.
+  (un soutien par appareil, le serveur faisant autorité), partage du lien et signalement avec motif
+  (un signalement par appareil et par suggestion).
+- **Accueil** : idées publiées les plus soutenues et idée du mois sélectionnée par l’administration.
 - **Suivre ma suggestion** : accès réservé à l’auteur via son numéro de suivi **et** son code secret ;
-  affiche statut, visibilité, progression et historique.
+  affiche statut, visibilité, dates de chaque étape, réponses officielles, progression déclarée et date prévue.
 - **Pages de contenu** : « Comment ça marche », « À propos », « Règles de participation », « Confidentialité ».
 - **Recherche et accessibilité** : navigation complète, liens d’évitement, thèmes clair/sombre, responsive.
 
@@ -52,8 +54,11 @@ et chacun peut suivre l’avancement de sa propre suggestion.
 - **Connexion** par mot de passe, session par jeton signé, expiration automatique.
 - **Liste des suggestions** : recherche, filtres (catégorie, statut, visibilité), tri, pagination,
   modification rapide du statut, bascule de visibilité, suppression.
-- **Détail administrateur** : édition complète (titre, description, catégorie, statut, lieu, auteur, informations complémentaires),
-  photos jointes visibles uniquement par l’administration, note interne de modération, historique et journal des actions.
+- **File « À traiter »** : compteurs et liste limitée aux statuts `En attente`, `Reçue` et `À l’étude`,
+  avec accès direct à la fiche et nombre de signalements.
+- **Détail administrateur** : consultation du contenu sans édition, gestion du statut et de la publication,
+  photos et motifs de signalement, réponses officielles, avancement/date prévue pour les suggestions en cours,
+  sélection de l’idée du mois, note interne de modération, historique et journal des actions.
 - **Statistiques** : totaux par statut et par catégorie, taux de publication, répartitions, graphiques.
 - **Journal d’audit** : actions de modération filtrables et paginées.
 
@@ -95,7 +100,7 @@ cd ..
 
 # 3. Base de données
 cd backend
-npm run migrate               # crée la base si besoin et applique les 4 migrations
+npm run migrate               # crée la base si besoin et applique les 6 migrations
 npm run check                 # vérifie la connexion et l'état du schéma
 cd ..
 ```
@@ -215,9 +220,11 @@ ou `{ "success": false, "error": { code, message, details? } }`.
 | `GET` | `/api/meta` | Statuts, catégories, limites, messages du projet |
 | `GET` | `/api/suggestions` | Liste paginée et filtrable des suggestions publiques |
 | `GET` | `/api/suggestions/:id` | Détail d’une suggestion publique |
+| `GET` | `/api/highlights` | Trois idées les plus soutenues et idée du mois |
 | `POST` | `/api/suggestions` | Dépôt d’une suggestion (retourne numéro de suivi et code secret) |
 | `POST` | `/api/suggestions/:id/photos` | Ajout/remplacement des photos (multipart `photos`, autorisé par le code secret de la suggestion) |
 | `POST` | `/api/suggestions/:id/support` | Soutien (un par appareil) |
+| `POST` | `/api/suggestions/:id/reports` | Signalement (un par appareil, motif requis) |
 | `POST` | `/api/tracking` | Suivi par numéro de suivi + code secret |
 
 ### Administration (en-tête `Authorization: Bearer <jeton>`)
@@ -228,10 +235,12 @@ ou `{ "success": false, "error": { code, message, details? } }`.
 | `GET` | `/api/admin/session` | Vérifie la session |
 | `POST` | `/api/admin/logout` | Révoque la session |
 | `GET` | `/api/admin/statistics` | Statistiques globales |
+| `GET` | `/api/admin/queue` | File limitée à En attente, Reçue et À l’étude |
+| `PATCH` | `/api/admin/monthly-idea` | Sélectionner ou retirer l’idée du mois (`suggestionId`, `null` pour retirer) |
 | `GET` | `/api/admin/suggestions` | Liste administrateur (tous statuts, tous Auteur) |
-| `GET` | `/api/admin/suggestions/:id` | Détail administrateur |
+| `GET` | `/api/admin/suggestions/:id` | Détail en lecture seule du contenu |
+| `DELETE` | `/api/admin/suggestions/:id/reports/:reportId` | Marquer un signalement comme traité en le retirant |
 | `GET` | `/api/admin/suggestions/:id/photos/:photoId/content` | Photo privée, session administrateur obligatoire |
-| `PATCH` | `/api/admin/suggestions/:id` | Édition |
 | `PATCH` | `/api/admin/suggestions/:id/status` | Changement de statut |
 | `PATCH` | `/api/admin/suggestions/:id/moderation` | Note interne et visibilité |
 | `GET` | `/api/admin/suggestions/:id/logs` | Historique d’une suggestion |
@@ -252,7 +261,11 @@ Ces listes, les libellés, les limites de saisie et les messages du projet sont 
 dans `shared/constants.js`, chargé par le backend et servi au frontend sur `/shared/constants.js` :
 le client et le serveur ne peuvent pas diverger.
 
-Migrations : `database/migrations/001…005` (suggestions, historique, soutiens, journal de modération, photos).
+Motifs officiels des signalements : contenu offensant, spam, informations personnelles,
+fausse information, contenu inapproprié et autre. Aucun nom ni contact du signalant n’est collecté.
+
+Migrations : `database/migrations/001…006` (suggestions, historique, soutiens, journal de modération,
+photos, signalements et champs de progression).
 Aucune donnée fictive n’est insérée en production.
 
 ---
@@ -264,8 +277,9 @@ cd backend
 npm test
 ```
 
-- **69 tests** au total : 26 tests unitaires (validation, formatage, règles métier) et 43 tests d’intégration
-  (API complète : dépôt, photos privées, liste, détail, soutien, suivi, authentification, administration, statistiques, journal).
+- **76 tests** au total : 27 tests unitaires (validation, formatage, règles métier) et 49 tests d’intégration
+  (API complète : dépôt, photos privées, signalements, file de modération, idée du mois, suivi, soutiens,
+  authentification, progression, statistiques et journal).
 - Les tests utilisent la base `lynaqe_connect_test`, créée puis remise à zéro automatiquement ;
   **la base de production n’est jamais touchée**.
 - Vérifications complémentaires possibles : `npm run check` (schéma) et `npm run migrate:status`.
@@ -281,7 +295,7 @@ LYNAQE Connect/
 ├── shared/
 │   └── constants.js          # source de vérité partagée (statuts, catégories, limites, messages)
 ├── database/
-│   ├── migrations/           # 4 migrations SQL versionnées
+│   ├── migrations/           # 6 migrations SQL versionnées
 │   └── seeds/                # reserved (aucune donnée de production)
 ├── frontend/
 │   ├── index.html            # coquille SPA
@@ -342,7 +356,7 @@ Depuis votre machine, avec un `.env` temporaire pointant vers la base distante :
 
 ```bash
 cd backend
-npm run migrate      # applique les 4 migrations
+npm run migrate      # applique les 6 migrations
 npm run check        # vérifie le schéma
 ```
 
