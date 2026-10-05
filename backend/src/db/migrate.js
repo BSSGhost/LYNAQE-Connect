@@ -135,7 +135,9 @@ async function main() {
   await connection.end();
   connection = await getConnection();
 
-  await ensureSchemaMigrationsTable(connection);
+  if (!statusOnly) {
+    await ensureSchemaMigrationsTable(connection);
+  }
 
   heading('Migrations');
   const files = (await readdir(paths.migrations))
@@ -146,9 +148,15 @@ async function main() {
     console.log(`  ${paint.warn('Aucun fichier .sql dans')} ${paths.migrations}`);
   }
 
-  const [appliedRows] = await connection.query(
-    'SELECT name, checksum, applied_at FROM schema_migrations ORDER BY name',
+  const [migrationTableRows] = await connection.query(
+    `SELECT TABLE_NAME
+       FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'schema_migrations'`,
+    [config.db.database],
   );
+  const [appliedRows] = migrationTableRows.length
+    ? await connection.query('SELECT name, checksum, applied_at FROM schema_migrations ORDER BY name')
+    : [[]];
   const applied = new Map(appliedRows.map((row) => [row.name, row]));
 
   for (const file of files) {
@@ -158,8 +166,14 @@ async function main() {
     const checksum = createHash('sha256').update(raw).digest('hex');
     const record = applied.get(file);
 
-    if (record && statusOnly) {
-      console.log(`  ${paint.dim('  installee')}  ${file}  ${paint.dim(record.applied_at.toISOString().slice(0, 19).replace('T', ' '))}`);
+    if (statusOnly) {
+      if (!record) {
+        console.log(`  ${paint.warn('  en attente')} ${file}`);
+      } else if (record.checksum !== checksum) {
+        console.log(`  ${paint.warn('  modifiee')}   ${file}`);
+      } else {
+        console.log(`  ${paint.dim('  installee')}  ${file}  ${paint.dim(record.applied_at.toISOString().slice(0, 19).replace('T', ' '))}`);
+      }
       continue;
     }
 
