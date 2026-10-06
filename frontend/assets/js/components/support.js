@@ -5,7 +5,7 @@
  */
 
 import { suggestionsApi } from '../core/api.js';
-import { toast } from '../core/ui.js';
+import { confirmDialog, toast } from '../core/ui.js';
 import { formatNumber } from '../core/format.js';
 
 const SUPPORT_STORAGE_KEY = 'lynaqe.supportedSuggestions';
@@ -26,7 +26,12 @@ function saveSupportedIds(ids) {
 
 function updateButtonState(button, supported) {
   button.classList.toggle('is-supported', supported);
-  button.setAttribute('aria-label', supported ? 'Retirer mon soutien' : 'Soutenir cette idée');
+  button.setAttribute('aria-pressed', String(supported));
+  button.setAttribute('aria-label', supported ? 'Soutenu' : 'Soutenir cette idée');
+  const state = button.querySelector('[data-support-state]');
+  if (state) state.textContent = supported ? 'Soutenu' : 'Soutenir';
+  const removeButton = button.parentElement?.querySelector(`[data-unsupport="${button.dataset.support}"]`);
+  if (removeButton) removeButton.hidden = !supported;
 }
 
 export function wireSupportButtons(root) {
@@ -37,27 +42,55 @@ export function wireSupportButtons(root) {
     const id = button.getAttribute('data-support');
     updateButtonState(button, supportedIds.has(id));
     button.addEventListener('click', async () => {
+      if (button.classList.contains('is-supported')) return;
       button.disabled = true;
       try {
-        const wasSupported = button.classList.contains('is-supported');
-        const { data } = wasSupported
-          ? await suggestionsApi.unsupport(id)
-          : await suggestionsApi.support(id);
+        const { data } = await suggestionsApi.support(id);
         const countEl = button.querySelector('[data-support-count]');
         if (countEl) countEl.textContent = formatNumber(data.supportCount);
-        const nextSupported = wasSupported ? !data.removed : true;
-        updateButtonState(button, nextSupported);
-        if (nextSupported) supportedIds.add(id);
-        else supportedIds.delete(id);
+        updateButtonState(button, true);
+        supportedIds.add(id);
         saveSupportedIds(supportedIds);
-        toast(
-          nextSupported ? 'Merci pour ton soutien !' : 'Ton soutien a été retiré.',
-          data.alreadySupported && !wasSupported ? 'info' : 'success',
-        );
+        toast(data.alreadySupported ? 'Tu soutiens déjà cette idée.' : 'Merci pour ton soutien !', data.alreadySupported ? 'info' : 'success');
       } catch (error) {
         toast(error.message, 'error');
       } finally {
         button.disabled = false;
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-unsupport]').forEach((button) => {
+    if (button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+    const id = button.getAttribute('data-unsupport');
+    button.addEventListener('click', async () => {
+      const confirmed = await confirmDialog({
+        title: 'Retirer mon soutien',
+        message: 'Veux-tu vraiment retirer ton soutien à cette suggestion ?',
+        confirmLabel: 'Retirer mon soutien',
+        danger: true,
+      });
+      if (!confirmed) return;
+
+      const supportButton = button.parentElement?.querySelector(`[data-support="${id}"]`);
+      if (!supportButton) return;
+      button.disabled = true;
+      supportButton.disabled = true;
+      try {
+        const { data } = await suggestionsApi.unsupport(id);
+        const countEl = supportButton.querySelector('[data-support-count]');
+        if (countEl) countEl.textContent = formatNumber(data.supportCount);
+        updateButtonState(supportButton, false);
+        const supportedIds = getSupportedIds();
+        supportedIds.delete(id);
+        saveSupportedIds(supportedIds);
+        toast(data.removed ? 'Ton soutien a été retiré.' : 'Aucun soutien actif sur cet appareil.', 'success');
+      } catch (error) {
+        toast(error.message, 'error');
+      } finally {
+        button.disabled = false;
+        supportButton.disabled = false;
       }
     });
   });

@@ -30,6 +30,14 @@ const SORTS = [
   { value: 'status', label: 'Par statut' },
 ];
 
+const QUICK_ACTIONS = [
+  { status: 'Reçue', label: 'Recevoir' },
+  { status: 'À l’étude', label: 'Étudier' },
+  { status: 'En cours', label: 'En cours' },
+  { status: 'Réalisée', label: 'Réalisée' },
+  { status: 'Non retenue', label: 'Rejeter' },
+];
+
 export async function render(context) {
   if (!guardAdmin()) return;
 
@@ -75,8 +83,9 @@ async function load(context) {
     if (data.length) {
       container.innerHTML =
         '<p class="result-count">' + formatNumber(meta.total) + ' suggestion' + (meta.total > 1 ? 's' : '') + '</p>' +
+        bulkToolbarHtml() +
         '<div class="table-wrap"><table class="data-table">' +
-        '<thead><tr><th>Suggestion</th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>' +
+        '<thead><tr><th>Suggestion <input type="checkbox" data-select-all aria-label="Sélectionner toutes les suggestions de cette page" /></th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions rapides</th><th>Actions</th></tr></thead>' +
         '<tbody>' + data.map(rowHtml).join('') + '</tbody>' +
         '</table></div>' +
         paginationHtml(meta);
@@ -89,6 +98,7 @@ async function load(context) {
     }
 
     wireRows(container);
+    wireBulkActions(container);
     wirePagination(container, query);
   } catch (error) {
     handleAdminError(error);
@@ -121,9 +131,14 @@ function rowHtml(suggestion) {
   const actionsDelete = '<button type="button" data-delete="' + id + '" data-title="' + esc(title) + '">' + icon('trash', { size: 16 }) + '<span>Supprimer</span></button>';
   const visibilityAction = '<button type="button" class="admin-menu-visibility" data-toggle-visibility="' + id + '" data-visibility="' + visibility + '" aria-label="' + (isPublic ? 'Dépublier cette suggestion' : 'Publier cette suggestion') + '">' + icon(isPublic ? 'eyeOff' : 'eye', { size: 16 }) + '<span>' + (isPublic ? 'Dépublier' : 'Publier') + '</span></button>';
   const cellActions = '<td class="cell-actions"><details class="admin-row-menu"><summary aria-label="Actions pour ' + esc(title) + '">' + icon('dots', { size: 19 }) + '</summary><div class="admin-row-menu-panel">' + actionsView + actionsSelect + visibilityAction + actionsDelete + '</div></details></td>';
+  const quickActions = '<td class="admin-quick-actions">' + QUICK_ACTIONS.map((action) =>
+    '<button class="btn btn-outline btn-sm" type="button" data-quick-status="' + esc(action.status) + '" data-quick-for="' + id + '"' +
+      (action.status === suggestion.status ? ' disabled' : '') + '>' + esc(action.label) + '</button>',
+  ).join('') + '</td>';
 
   return '<tr data-row="' + id + '">' +
     '<td>' +
+    '<input class="admin-row-select" type="checkbox" data-row-select value="' + id + '" aria-label="Sélectionner ' + esc(title) + '" />' +
     '<a class="cell-title" href="' + hrefUrl + '">' + esc(title) + '</a>' +
     '<div class="cell-sub">' + esc(trackingCode) + ' · ' + esc(category) + '</div>' +
     '</td>' +
@@ -131,8 +146,23 @@ function rowHtml(suggestion) {
     '<td class="cell-date">' + esc(formatDate(createdAt)) + '</td>' +
     '<td class="cell-status"><span class="badge tone-' + tone + '"><span class="dot"></span>' + esc(statusValue) + '</span></td>' +
     '<td>' + formatNumber(supportCount) + '</td>' +
+    quickActions +
     cellActions +
     '</tr>';
+}
+
+function bulkToolbarHtml() {
+  const statusOptions = SUGGESTION_STATUSES.map(
+    (status) => '<option value="' + esc(status) + '">' + esc(status) + '</option>',
+  ).join('');
+  return '<div class="admin-bulk-toolbar" data-bulk-toolbar hidden>' +
+    '<strong data-bulk-count>0 sélectionnée</strong>' +
+    '<label for="bulk-status">Nouveau statut</label>' +
+    '<select id="bulk-status" data-bulk-status>' + statusOptions + '</select>' +
+    '<button class="btn btn-outline btn-sm" type="button" data-bulk-action="status">Modifier le statut</button>' +
+    '<button class="btn btn-outline btn-sm" type="button" data-bulk-action="publish">Publier</button>' +
+    '<button class="btn btn-outline btn-sm danger" type="button" data-bulk-action="archive">Archiver</button>' +
+    '</div>';
 }
 
 function categoryTagInfo(categoryValue) {
@@ -182,6 +212,22 @@ function wireFilters(main, query) {
 }
 
 function wireRows(container) {
+  container.querySelectorAll('[data-quick-for]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = button.getAttribute('data-quick-for');
+      const status = button.getAttribute('data-quick-status');
+      button.disabled = true;
+      try {
+        const { data } = await adminApi.changeStatus(id, { status });
+        updateRowStatus(container, id, data.suggestion);
+        toast('Statut mis à jour : ' + status + '.', 'success');
+      } catch (error) {
+        handleAdminError(error);
+        button.disabled = false;
+      }
+    });
+  });
+
   container.querySelectorAll('[data-status-for]').forEach((select) => {
     select.addEventListener('change', async () => {
       const id = select.getAttribute('data-status-for');
@@ -244,6 +290,78 @@ function wireRows(container) {
   });
 }
 
+function wireBulkActions(container) {
+  const toolbar = container.querySelector('[data-bulk-toolbar]');
+  const selectAll = container.querySelector('[data-select-all]');
+  const updateSelection = () => {
+    const checkboxes = [...container.querySelectorAll('[data-row-select]')];
+    const selected = checkboxes.filter((checkbox) => checkbox.checked);
+    toolbar.hidden = selected.length === 0;
+    toolbar.querySelector('[data-bulk-count]').textContent =
+      selected.length + ' sélectionnée' + (selected.length === 1 ? '' : 's');
+    toolbar.querySelectorAll('[data-bulk-action]').forEach((button) => {
+      button.disabled = selected.length === 0;
+    });
+    if (selectAll) {
+      selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+      selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+    }
+  };
+
+  container.querySelectorAll('[data-row-select]').forEach((checkbox) => {
+    checkbox.addEventListener('change', updateSelection);
+  });
+  selectAll?.addEventListener('change', () => {
+    container.querySelectorAll('[data-row-select]').forEach((checkbox) => {
+      checkbox.checked = selectAll.checked;
+    });
+    updateSelection();
+  });
+  updateSelection();
+
+  toolbar.querySelectorAll('[data-bulk-action]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const ids = [...container.querySelectorAll('[data-row-select]:checked')]
+        .map((checkbox) => Number(checkbox.value));
+      if (!ids.length) return;
+
+      const type = button.getAttribute('data-bulk-action');
+      const action = type === 'status'
+        ? { type, status: toolbar.querySelector('[data-bulk-status]').value }
+        : { type };
+      if (type === 'archive') {
+        const confirmed = await confirmDialog({
+          title: 'Archiver les suggestions',
+          message: 'Archiver ' + ids.length + ' suggestion' + (ids.length === 1 ? '' : 's') + ' sélectionnée' + (ids.length === 1 ? '' : 's') + ' ?',
+          confirmLabel: 'Archiver',
+          danger: true,
+        });
+        if (!confirmed) return;
+      }
+
+      toolbar.querySelectorAll('button, select').forEach((control) => {
+        control.disabled = true;
+      });
+      try {
+        const { data } = await adminApi.bulkUpdateSuggestions(ids, action);
+        data.items.forEach((suggestion) => updateRowStatus(container, suggestion.id, suggestion));
+        container.querySelectorAll('[data-row-select]').forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+        updateSelection();
+        toast(data.updated + ' suggestion' + (data.updated === 1 ? '' : 's') + ' mise' + (data.updated === 1 ? '' : 's') + ' à jour.', 'success');
+      } catch (error) {
+        handleAdminError(error);
+      } finally {
+        toolbar.querySelectorAll('button, select').forEach((control) => {
+          control.disabled = false;
+        });
+        updateSelection();
+      }
+    });
+  });
+}
+
 function updateRowStatus(container, id, suggestion) {
   const row = container.querySelector('[data-row="' + id + '"]');
   if (!row || !suggestion) return;
@@ -267,6 +385,9 @@ function updateRowStatus(container, id, suggestion) {
 
   const select = row.querySelector('[data-status-for]');
   if (select) select.value = suggestion.status;
+  row.querySelectorAll('[data-quick-status]').forEach((button) => {
+    button.disabled = button.getAttribute('data-quick-status') === suggestion.status;
+  });
 }
 
 function wirePagination(container, query) {

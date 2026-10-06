@@ -9,7 +9,7 @@ import { href } from '../../core/router.js';
 import { icon } from '../../core/icons.js';
 import { adminApi } from '../../core/api.js';
 import { formatDate, formatDateTime, formatNumber, formatPercent } from '../../core/format.js';
-import { loadingHtml, statCardHtml, emptyStateHtml } from '../../components/layout.js';
+import { loadingHtml, statCardHtml } from '../../components/layout.js';
 import { lineChartSvg, barChartSvg, horizontalBarsHtml } from '../../components/charts.js';
 import { guardAdmin, handleAdminError, adminNavHtml, sidebarHtml, wireAdminBar } from './admin-shell.js';
 import { logoutAdmin } from './admin-logout.js';
@@ -37,7 +37,7 @@ export async function render() {
     const { data } = await adminApi.statistics();
     mount(
       main,
-      `${sidebarHtml(ROUTES.adminStatistics)}${adminNavHtml(ROUTES.adminStatistics)}${data.isEmpty ? emptyHtml() : dashboardHtml(data)}`,
+      `${sidebarHtml(ROUTES.adminStatistics)}${adminNavHtml(ROUTES.adminStatistics)}${dashboardHtml(data)}`,
     );
     wireAdminBar(() => logoutAdmin());
   } catch (error) {
@@ -50,22 +50,16 @@ export async function render() {
   }
 }
 
-function emptyHtml() {
-  return `<div class="container">${emptyStateHtml({
-    title: 'Aucune donnée pour le moment',
-    message: 'Les statistiques apparaîtront dès que la première suggestion aura été déposée.',
-  })}</div>`;
-}
-
 function dashboardHtml(data) {
   const t = data.totals;
   const i = data.indicators;
+  const toProcess = t.pending + t.received + t.underReview;
 
   const cards = [
-    statCardHtml({ label: 'Suggestions reçues', value: formatNumber(t.suggestions), icon: 'inbox', tone: 'info' }),
-    statCardHtml({ label: 'En attente', value: formatNumber(t.pending), icon: 'clock', tone: 'pending' }),
-    statCardHtml({ label: 'En cours', value: formatNumber(t.running), icon: 'refresh', tone: 'progress' }),
+    statCardHtml({ label: 'Suggestions', value: formatNumber(t.suggestions), icon: 'inbox', tone: 'info' }),
     statCardHtml({ label: 'Réalisées', value: formatNumber(t.realized), icon: 'checkCircle', tone: 'done' }),
+    statCardHtml({ label: 'À traiter', value: formatNumber(toProcess), icon: 'clock', tone: 'pending' }),
+    statCardHtml({ label: 'Soutiens', value: formatNumber(t.supports), icon: 'thumbsUp', tone: 'progress' }),
   ].join('');
 
   const indicators = [
@@ -102,6 +96,15 @@ function dashboardHtml(data) {
     </header>
 
     <div class="stats-grid">${cards}</div>
+
+    <section class="admin-attention-panel" aria-labelledby="admin-attention-title">
+      <div>
+        <p class="admin-page-eyebrow">🚨 À traiter maintenant</p>
+        <h2 id="admin-attention-title">${formatNumber(toProcess)} suggestion${toProcess === 1 ? '' : 's'} à traiter</h2>
+        <p>En attente : ${formatNumber(t.pending)} · Reçues : ${formatNumber(t.received)} · À l’étude : ${formatNumber(t.underReview)}</p>
+      </div>
+      <a class="btn btn-primary" href="${href(ROUTES.adminQueue)}">${icon('inbox', { size: 16 })} Voir les ${formatNumber(toProcess)} suggestions</a>
+    </section>
 
     <section class="panel">
       <h2>${icon('chart', { size: 18 })} Indicateurs clés</h2>

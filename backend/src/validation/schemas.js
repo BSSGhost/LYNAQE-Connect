@@ -199,6 +199,20 @@ export const moderationUpdate = z
   })
   .strict();
 
+const bulkSuggestionIds = z
+  .array(z.coerce.number().int().positive().safe())
+  .min(1)
+  .max(50)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: 'Une suggestion ne peut être sélectionnée qu’une seule fois.',
+  });
+
+export const bulkSuggestionUpdate = z.discriminatedUnion('type', [
+  z.object({ ids: bulkSuggestionIds, type: z.literal('status'), status: statusField }).strict(),
+  z.object({ ids: bulkSuggestionIds, type: z.literal('publish') }).strict(),
+  z.object({ ids: bulkSuggestionIds, type: z.literal('archive') }).strict(),
+]);
+
 // ---------------------------------------------------------------------------
 // Listes paginees
 // ---------------------------------------------------------------------------
@@ -263,6 +277,7 @@ export const schemas = Object.freeze({
   reportSuggestion,
   selectMonthlyIdea,
   moderationUpdate,
+  bulkSuggestionUpdate,
   publicListQuery,
   adminListQuery,
   moderationQueueQuery,

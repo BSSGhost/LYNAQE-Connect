@@ -324,6 +324,27 @@
   opacity: 0.8;
 }
 
+.support-remove-action {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.support-remove-action:hover {
+  color: var(--danger);
+}
+
+.support-remove-action:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
 /* --- Dépôt : mise en page ---------------------------------------------- */
 .submit-layout {
   display: grid;
@@ -1559,6 +1580,34 @@
   gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   margin-bottom: var(--space-6);
+}
+
+.admin-attention-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warning, #d4af37);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.admin-attention-panel h2 {
+  margin: var(--space-1) 0;
+  font-size: 1.2rem;
+}
+
+.admin-attention-panel p:last-child {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.admin-attention-panel .btn {
+  flex: none;
 }
 
 .stat-icon {
@@ -5435,7 +5484,7 @@
 }
 
 .admin-results-panel .data-table {
-  min-width: 850px;
+  min-width: 1180px;
   font-size: 0.84rem;
 }
 
@@ -5461,6 +5510,59 @@
 .admin-results-panel .cell-sub {
   margin-top: 0.2rem;
   font-size: 0.72rem;
+}
+
+.admin-row-select,
+.admin-results-panel thead input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+  vertical-align: middle;
+}
+
+.admin-row-select {
+  margin: 0 0.5rem 0 0;
+}
+
+.admin-quick-actions {
+  min-width: 280px;
+}
+
+.admin-quick-actions .btn {
+  min-height: 30px;
+  margin: 0.12rem;
+  padding: 0.3rem 0.48rem;
+  font-size: 0.7rem;
+}
+
+.admin-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface-2);
+}
+
+.admin-bulk-toolbar[hidden] {
+  display: none;
+}
+
+.admin-bulk-toolbar strong {
+  margin-right: auto;
+}
+
+.admin-bulk-toolbar label {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.admin-bulk-toolbar select {
+  min-height: 36px;
+  max-width: 190px;
 }
 
 .admin-row-menu {
@@ -5685,7 +5787,8 @@
     grid-template-areas:
       "suggestion suggestion"
       "date status"
-      "support actions";
+      "support actions"
+      "quick quick";
     gap: 0.4rem 0.6rem;
     padding: 0.75rem;
     border: 1px solid var(--border);
@@ -5733,8 +5836,50 @@
   }
 
   .admin-results-panel .data-table tbody tr td:nth-child(6) {
+    grid-area: quick;
+  }
+
+  .admin-results-panel .data-table tbody tr td:nth-child(7) {
     grid-area: actions;
     justify-self: end;
+  }
+
+  .admin-quick-actions {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .admin-quick-actions::before {
+    content: "Actions rapides : ";
+    width: 100%;
+    color: var(--text-soft);
+    font-size: 0.72rem;
+  }
+
+  .admin-attention-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-attention-panel .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-bulk-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-bulk-toolbar select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .admin-bulk-toolbar .btn {
+    justify-content: center;
   }
 
   .admin-row-menu-panel {

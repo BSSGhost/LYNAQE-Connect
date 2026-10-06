@@ -922,3 +922,41 @@ test('la liste publique est paginee et le tri par soutiens fonctionne', async ()
   const rows = await query('SELECT COUNT(*) AS n FROM suggestions');
   assert.ok(Number(rows[0].n) > 0);
 });
+
+test('les actions groupées modifient le statut, publient et archivent atomiquement', async () => {
+  const list = await api('/api/admin/suggestions?limit=2', { token: adminToken });
+  const ids = list.body.data.map((item) => item.id);
+  assert.equal(ids.length, 2);
+
+  const statusChange = await api('/api/admin/suggestions/bulk', {
+    method: 'PATCH',
+    token: adminToken,
+    body: { ids, type: 'status', status: 'À l’étude' },
+  });
+  assert.equal(statusChange.status, 200);
+  assert.equal(statusChange.body.data.updated, 2);
+  assert.ok(statusChange.body.data.items.every((item) => item.status === 'À l’étude'));
+
+  const published = await api('/api/admin/suggestions/bulk', {
+    method: 'PATCH',
+    token: adminToken,
+    body: { ids, type: 'publish' },
+  });
+  assert.equal(published.status, 200);
+  assert.ok(published.body.data.items.every((item) => item.visibility === 'publique'));
+
+  const archived = await api('/api/admin/suggestions/bulk', {
+    method: 'PATCH',
+    token: adminToken,
+    body: { ids, type: 'archive' },
+  });
+  assert.equal(archived.status, 200);
+  assert.ok(archived.body.data.items.every((item) => item.status === 'Archivée'));
+
+  const invalid = await api('/api/admin/suggestions/bulk', {
+    method: 'PATCH',
+    token: adminToken,
+    body: { ids: [ids[0], 999999], type: 'publish' },
+  });
+  assert.equal(invalid.status, 404, 'une sélection périmée ne doit pas être traitée partiellement');
+});

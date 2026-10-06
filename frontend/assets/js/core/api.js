@@ -165,6 +165,8 @@ export const adminApi = {
     }),
   changeStatus: (id, payload) =>
     api.patch(`/admin/suggestions/${id}/status`, payload, { auth: true }),
+  bulkUpdateSuggestions: (ids, action) =>
+    api.patch('/admin/suggestions/bulk', { ids, ...action }, { auth: true }),
   moderate: (id, payload) =>
     api.patch(`/admin/suggestions/${id}/moderation`, payload, { auth: true }),
   remove: (id) => api.delete(`/admin/suggestions/${id}`, { auth: true }),

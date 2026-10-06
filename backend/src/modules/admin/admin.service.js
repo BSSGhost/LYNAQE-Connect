@@ -99,131 +99,153 @@ export function getSuggestionPhotoFile(suggestionId, photoId) {
  * @param {object} ctx requete Express (IP masquee, agent utilisateur)
  */
 export async function changeStatus(id, input, ctx) {
-  return transaction(async (connection) => {
-    const [rows] = await connection.execute(
-      `SELECT id, status, visibility, published_at, progress_percent, expected_completion_date
-         FROM suggestions WHERE id = ?`,
-      [id],
-    );
-    if (rows.length === 0) throw notFound('Cette suggestion n’existe pas.');
+  return transaction(async (connection) => applyStatusChange(connection, id, input, ctx));
+}
 
-    const current = rows[0];
-    const oldStatus = current.status;
-    const oldVisibility = current.visibility;
+async function applyStatusChange(connection, id, input, ctx) {
+  const [rows] = await connection.execute(
+    `SELECT id, status, visibility, published_at, progress_percent, expected_completion_date
+       FROM suggestions WHERE id = ? FOR UPDATE`,
+    [id],
+  );
+  if (rows.length === 0) throw notFound('Cette suggestion n’existe pas.');
 
-    const newStatus = input.status;
-    if (
-      newStatus !== 'En cours' &&
-      (input.progressPercent !== undefined || input.expectedCompletionDate !== undefined)
-    ) {
-      throw validationError('Le pourcentage et la date prévue ne peuvent être définis que pour une suggestion « En cours ».');
-    }
-    // `publish` est optionnel : absent = la visibilite ne change pas.
-    const newVisibility =
-      input.publish === undefined ? oldVisibility : input.publish ? 'publique' : 'privee';
+  const current = rows[0];
+  const oldStatus = current.status;
+  const oldVisibility = current.visibility;
+  const newStatus = input.status ?? oldStatus;
+  if (
+    newStatus !== 'En cours' &&
+    (input.progressPercent !== undefined || input.expectedCompletionDate !== undefined)
+  ) {
+    throw validationError('Le pourcentage et la date prévue ne peuvent être définis que pour une suggestion « En cours ».');
+  }
+  const newVisibility =
+    input.publish === undefined ? oldVisibility : input.publish ? 'publique' : 'privee';
 
-    const statusChanged = newStatus !== oldStatus;
-    const visibilityChanged = newVisibility !== oldVisibility;
-    const newProgressPercent =
-      newStatus === 'En cours'
-        ? input.progressPercent === undefined
-          ? current.progress_percent
-          : input.progressPercent
-        : null;
-    const newCompletionDate =
-      newStatus === 'En cours'
-        ? input.expectedCompletionDate === undefined
-          ? current.expected_completion_date
-          : input.expectedCompletionDate
-        : null;
-    const progressChanged =
-      newProgressPercent !== current.progress_percent ||
-      String(newCompletionDate ?? '') !==
-        String(current.expected_completion_date instanceof Date
-          ? current.expected_completion_date.toISOString().slice(0, 10)
-          : current.expected_completion_date ?? '');
+  const statusChanged = newStatus !== oldStatus;
+  const visibilityChanged = newVisibility !== oldVisibility;
+  const newProgressPercent =
+    newStatus === 'En cours'
+      ? input.progressPercent === undefined
+        ? current.progress_percent
+        : input.progressPercent
+      : null;
+  const newCompletionDate =
+    newStatus === 'En cours'
+      ? input.expectedCompletionDate === undefined
+        ? current.expected_completion_date
+        : input.expectedCompletionDate
+      : null;
+  const progressChanged =
+    newProgressPercent !== current.progress_percent ||
+    String(newCompletionDate ?? '') !==
+      String(current.expected_completion_date instanceof Date
+        ? current.expected_completion_date.toISOString().slice(0, 10)
+        : current.expected_completion_date ?? '');
 
-    if (!statusChanged && !visibilityChanged && !input.message && !progressChanged) {
-      return { suggestion: await loadInTransaction(connection, id), changed: false };
-    }
+  if (!statusChanged && !visibilityChanged && !input.message && !progressChanged) {
+    return { suggestion: await loadInTransaction(connection, id), changed: false };
+  }
 
-    // `published_at` n'est positionne qu'a la premiere publication et remis a
-    // zero si la suggestion redevient privee.
-    let publishedAt = current.published_at;
-    if (newVisibility === 'publique' && !publishedAt) publishedAt = new Date();
-    if (newVisibility === 'privee') publishedAt = null;
+  let publishedAt = current.published_at;
+  if (newVisibility === 'publique' && !publishedAt) publishedAt = new Date();
+  if (newVisibility === 'privee') publishedAt = null;
 
-    await connection.execute(
-      `UPDATE suggestions
-          SET status = ?, visibility = ?, published_at = ?,
-              progress_percent = ?, expected_completion_date = ?,
-              updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?`,
-      [newStatus, newVisibility, publishedAt, newProgressPercent, newCompletionDate, id],
-    );
+  await connection.execute(
+    `UPDATE suggestions
+        SET status = ?, visibility = ?, published_at = ?,
+            progress_percent = ?, expected_completion_date = ?,
+            updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?`,
+    [newStatus, newVisibility, publishedAt, newProgressPercent, newCompletionDate, id],
+  );
 
-    // --- Timeline ---------------------------------------------------------
-    const eventType = visibilityChanged
-      ? newVisibility === 'publique'
-        ? 'publication'
-        : 'message'
-      : statusChanged
-        ? 'statut'
-        : progressChanged
-          ? 'modification'
-          : 'message';
-    const publicMessage =
-      input.message ??
-      (progressChanged && !statusChanged && !visibilityChanged
-        ? 'Le plan de réalisation a été mis à jour.'
-        : null);
+  const eventType = visibilityChanged
+    ? newVisibility === 'publique'
+      ? 'publication'
+      : 'message'
+    : statusChanged
+      ? 'statut'
+      : progressChanged
+        ? 'modification'
+        : 'message';
+  const publicMessage =
+    input.message ??
+    (progressChanged && !statusChanged && !visibilityChanged
+      ? 'Le plan de réalisation a été mis à jour.'
+      : null);
 
-    await insertSuggestionUpdate(connection, {
-      suggestionId: id,
-      eventType,
-      oldStatus: statusChanged ? oldStatus : null,
-      newStatus: statusChanged ? newStatus : null,
-      publicMessage,
-      authorType: 'admin',
-    });
+  await insertSuggestionUpdate(connection, {
+    suggestionId: id,
+    eventType,
+    oldStatus: statusChanged ? oldStatus : null,
+    newStatus: statusChanged ? newStatus : null,
+    publicMessage,
+    authorType: 'admin',
+  });
 
-    // --- Journal de moderation --------------------------------------------
+  await insertModerationLog(connection, {
+    suggestionId: id,
+    action: statusChanged || visibilityChanged || input.message ? 'statut' : 'modification',
+    oldStatus,
+    newStatus,
+    oldVisibility,
+    newVisibility,
+    note: input.message ?? (progressChanged ? 'Plan de réalisation mis à jour.' : null),
+    ...audit(ctx),
+  });
+
+  if (oldVisibility !== 'publique' && newVisibility === 'publique') {
     await insertModerationLog(connection, {
       suggestionId: id,
-      action: statusChanged || visibilityChanged || input.message ? 'statut' : 'modification',
+      action: 'publication',
       oldStatus,
       newStatus,
       oldVisibility,
       newVisibility,
-      note: input.message ?? (progressChanged ? 'Plan de réalisation mis à jour.' : null),
+      note: 'Suggestion publiee.',
       ...audit(ctx),
     });
+  } else if (oldVisibility === 'publique' && newVisibility === 'privee') {
+    await insertModerationLog(connection, {
+      suggestionId: id,
+      action: 'depublication',
+      oldStatus,
+      newStatus,
+      oldVisibility,
+      newVisibility,
+      note: 'Suggestion retiree de la liste publique.',
+      ...audit(ctx),
+    });
+  }
 
-    if (oldVisibility !== 'publique' && newVisibility === 'publique') {
-      await insertModerationLog(connection, {
-        suggestionId: id,
-        action: 'publication',
-        oldStatus,
-        newStatus,
-        oldVisibility,
-        newVisibility,
-        note: 'Suggestion publiee.',
-        ...audit(ctx),
-      });
-    } else if (oldVisibility === 'publique' && newVisibility === 'privee') {
-      await insertModerationLog(connection, {
-        suggestionId: id,
-        action: 'depublication',
-        oldStatus,
-        newStatus,
-        oldVisibility,
-        newVisibility,
-        note: 'Suggestion retiree de la liste publique.',
-        ...audit(ctx),
-      });
+  return { suggestion: await loadInTransaction(connection, id), changed: true };
+}
+
+/** Applique une action groupée dans une seule transaction. */
+export async function bulkUpdateSuggestions(ids, action, ctx) {
+  return transaction(async (connection) => {
+    const placeholders = ids.map(() => '?').join(', ');
+    const [rows] = await connection.execute(
+      `SELECT id FROM suggestions WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`,
+      ids,
+    );
+    if (rows.length !== ids.length) {
+      throw notFound('Au moins une suggestion sélectionnée n’existe plus.');
     }
 
-    return { suggestion: await loadInTransaction(connection, id), changed: true };
+    const input = action.type === 'status'
+      ? { status: action.status }
+      : action.type === 'publish'
+        ? { publish: true }
+        : { status: 'Archivée' };
+    const items = [];
+    for (const id of ids) {
+      const result = await applyStatusChange(connection, id, input, ctx);
+      items.push(result.suggestion);
+    }
+    return { updated: items.length, items };
   });
 }
 

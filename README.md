@@ -59,6 +59,8 @@ et chacun peut suivre l’avancement de sa propre suggestion.
 - **Détail administrateur** : consultation du contenu sans édition, gestion du statut et de la publication,
   photos et motifs de signalement, réponses officielles, avancement/date prévue pour les suggestions en cours,
   sélection de l’idée du mois, note interne de modération, historique et journal des actions.
+- **Tableau de bord** : totaux des suggestions, réalisations, éléments à traiter et soutiens, avec accès direct à la file.
+- **Actions rapides et groupées** : changement de statut depuis la liste, publication, archivage et sélection multiple (jusqu’à 50 suggestions).
 - **Statistiques** : totaux par statut et par catégorie, taux de publication, répartitions, graphiques.
 - **Journal d’audit** : actions de modération filtrables et paginées.
 
@@ -238,6 +240,7 @@ ou `{ "success": false, "error": { code, message, details? } }`.
 | `GET` | `/api/admin/queue` | File limitée à En attente, Reçue et À l’étude |
 | `PATCH` | `/api/admin/monthly-idea` | Sélectionner ou retirer l’idée du mois (`suggestionId`, `null` pour retirer) |
 | `GET` | `/api/admin/suggestions` | Liste administrateur (tous statuts, tous Auteur) |
+| `PATCH` | `/api/admin/suggestions/bulk` | Changement de statut, publication ou archivage de 1 à 50 suggestions |
 | `GET` | `/api/admin/suggestions/:id` | Détail en lecture seule du contenu |
 | `DELETE` | `/api/admin/suggestions/:id/reports/:reportId` | Marquer un signalement comme traité en le retirant |
 | `GET` | `/api/admin/suggestions/:id/photos/:photoId/content` | Photo privée, session administrateur obligatoire |
@@ -277,7 +280,7 @@ cd backend
 npm test
 ```
 
-- **76 tests** au total : 27 tests unitaires (validation, formatage, règles métier) et 49 tests d’intégration
+- **77 tests** au total : 27 tests unitaires (validation, formatage, règles métier) et 50 tests d’intégration
   (API complète : dépôt, photos privées, signalements, file de modération, idée du mois, suivi, soutiens,
   authentification, progression, statistiques et journal).
 - Les tests utilisent la base `lynaqe_connect_test`, créée puis remise à zéro automatiquement ;

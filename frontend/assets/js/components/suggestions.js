@@ -33,10 +33,15 @@ function excerpt(text, max = 220) {
 export function supportButtonHtml(suggestion, { supported = false } = {}) {
   return `
     <button class="support-button ${supported ? 'is-supported' : ''}" type="button"
-      data-support="${suggestion.id}" aria-label="Soutenir cette idée">
+      data-support="${suggestion.id}" aria-pressed="${supported}"
+      aria-label="${supported ? 'Soutenu' : 'Soutenir cette idée'}">
       ${icon('thumbsUp', { size: 16 })}
+      <span data-support-state>${supported ? 'Soutenu' : 'Soutenir'}</span>
       <span data-support-count>${formatNumber(suggestion.supportCount)}</span>
       <span class="visually-hidden"> soutien${pluralize(suggestion.supportCount, '', 's')}</span>
+    </button>
+    <button class="support-remove-action" type="button" data-unsupport="${suggestion.id}" ${supported ? '' : 'hidden'}>
+      Retirer mon soutien
     </button>
   `;
 }

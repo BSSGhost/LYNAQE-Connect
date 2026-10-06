@@ -148,6 +148,7 @@ export function createApp() {
             'GET    /api/admin/queue',
             'PATCH  /api/admin/monthly-idea',
             'GET    /api/admin/suggestions',
+            'PATCH  /api/admin/suggestions/bulk',
             'GET    /api/admin/suggestions/:id',
             'DELETE /api/admin/suggestions/:id/reports/:reportId',
             'PATCH  /api/admin/suggestions/:id/status',

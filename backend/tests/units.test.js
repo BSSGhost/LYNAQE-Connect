@@ -317,6 +317,18 @@ test('les motifs de signalement et les dates d’avancement sont valides et stri
     false,
   );
   assert.equal(validate(schemas.selectMonthlyIdea, { suggestionId: null }).success, true);
+  assert.equal(
+    validate(schemas.bulkSuggestionUpdate, { ids: [1, 2], type: 'status', status: 'Reçue' }).success,
+    true,
+  );
+  assert.equal(
+    validate(schemas.bulkSuggestionUpdate, { ids: [1, 1], type: 'publish' }).success,
+    false,
+  );
+  assert.equal(
+    validate(schemas.bulkSuggestionUpdate, { ids: [1], type: 'status', status: 'Terminée' }).success,
+    false,
+  );
 });
 
 test('le schema de connexion admin exige un mot de passe raisonnable', () => {

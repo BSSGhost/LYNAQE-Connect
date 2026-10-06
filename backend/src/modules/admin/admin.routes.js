@@ -10,6 +10,7 @@
  *   POST   /api/admin/logout
  *   GET    /api/admin/statistics
  *   GET    /api/admin/suggestions
+ *   PATCH  /api/admin/suggestions/bulk
  *   GET    /api/admin/suggestions/:id
  *   PATCH  /api/admin/suggestions/:id/status
  *   PATCH  /api/admin/suggestions/:id/moderation
@@ -161,6 +162,17 @@ adminRouter.get(
       total: result.total,
       totalPages: result.totalPages,
     });
+  }),
+);
+
+adminRouter.patch(
+  '/suggestions/bulk',
+  adminLimiter,
+  requireAdmin,
+  validateBody(schemas.bulkSuggestionUpdate, 'Action groupée invalide.'),
+  asyncHandler(async (req, res) => {
+    const { ids, ...action } = req.body;
+    return ok(res, await adminService.bulkUpdateSuggestions(ids, action, req));
   }),
 );
 
