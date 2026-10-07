@@ -101,5 +101,5 @@ export function readParams(search = window.location.search) {
 
 /** Force le défilement vers le haut (changement de page du routeur). */
 export function scrollTop() {
-  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
