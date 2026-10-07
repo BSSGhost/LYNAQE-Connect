@@ -140,7 +140,7 @@ function rowHtml(suggestion) {
     '<td>' +
     '<input class="admin-row-select" type="checkbox" data-row-select value="' + id + '" aria-label="Sélectionner ' + esc(title) + '" />' +
     '<a class="cell-title" href="' + hrefUrl + '">' + esc(title) + '</a>' +
-    '<div class="cell-sub">' + esc(trackingCode) + ' · ' + esc(category) + '</div>' +
+    '<div class="cell-sub">' + esc(trackingCode) + '</div>' +
     '</td>' +
     '<td>' + esc(category) + '</td>' +
     '<td class="cell-date">' + esc(formatDate(createdAt)) + '</td>' +

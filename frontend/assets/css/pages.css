@@ -5484,20 +5484,39 @@
 }
 
 .admin-results-panel .data-table {
-  min-width: 1180px;
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
   font-size: 0.84rem;
 }
+
+.admin-results-panel .data-table th:nth-child(1),
+.admin-results-panel .data-table td:nth-child(1) { width: 24%; }
+.admin-results-panel .data-table th:nth-child(2),
+.admin-results-panel .data-table td:nth-child(2) { width: 17%; }
+.admin-results-panel .data-table th:nth-child(3),
+.admin-results-panel .data-table td:nth-child(3) { width: 12%; }
+.admin-results-panel .data-table th:nth-child(4),
+.admin-results-panel .data-table td:nth-child(4) { width: 10%; }
+.admin-results-panel .data-table th:nth-child(5),
+.admin-results-panel .data-table td:nth-child(5) { width: 7%; }
+.admin-results-panel .data-table th:nth-child(6),
+.admin-results-panel .data-table td:nth-child(6) { width: 25%; }
+.admin-results-panel .data-table th:nth-child(7),
+.admin-results-panel .data-table td:nth-child(7) { width: 5%; }
 
 .admin-results-panel .data-table th {
   padding: 0.8rem 0.85rem;
   background: var(--surface-2);
   font-size: 0.66rem;
   letter-spacing: 0.08em;
+  white-space: normal;
 }
 
 .admin-results-panel .data-table td {
   padding: 0.8rem 0.85rem;
   vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .admin-results-panel .cell-title {
@@ -5525,14 +5544,42 @@
 }
 
 .admin-quick-actions {
-  min-width: 280px;
+  min-width: 0;
+}
+
+.admin-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
 }
 
 .admin-quick-actions .btn {
+  min-width: 0;
   min-height: 30px;
-  margin: 0.12rem;
-  padding: 0.3rem 0.48rem;
-  font-size: 0.7rem;
+  padding: 0.3rem 0.25rem;
+  font-size: 0.67rem;
+  white-space: nowrap;
+}
+
+.admin-results-panel .data-table .cell-title {
+  overflow-wrap: anywhere;
+}
+
+.admin-results-panel .data-table .cell-date,
+.admin-results-panel .data-table .cell-status,
+.admin-results-panel .data-table td:nth-child(5) {
+  white-space: nowrap;
+}
+
+@media (min-width: 681px) and (max-width: 1000px) {
+  .admin-results-panel .data-table th,
+  .admin-results-panel .data-table td {
+    padding-inline: 0.45rem;
+  }
+
+  .admin-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .admin-bulk-toolbar {
@@ -5849,6 +5896,10 @@
     flex-wrap: wrap;
     gap: 0.25rem;
     min-width: 0;
+  }
+
+  .admin-quick-actions .btn {
+    flex: 1 1 auto;
   }
 
   .admin-quick-actions::before {
