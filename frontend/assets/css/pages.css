@@ -5506,6 +5506,7 @@
 .admin-results-panel .data-table th {
   padding: 0.8rem 0.85rem;
   background: var(--surface-2);
+  color: var(--text-soft);
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   white-space: normal;
@@ -5533,12 +5534,65 @@
   font-size: 0.72rem;
 }
 
+.admin-select-all-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
 .admin-row-select,
 .admin-results-panel thead input[type="checkbox"] {
+  appearance: none;
+  display: inline-grid;
   width: 1rem;
   height: 1rem;
-  accent-color: var(--primary);
+  flex: 0 0 1rem;
+  place-content: center;
+  margin: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 0.25rem;
+  background: var(--surface);
+  color: #fff;
   vertical-align: middle;
+  cursor: pointer;
+}
+
+.admin-row-select:checked,
+.admin-results-panel thead input[type="checkbox"]:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.admin-row-select:checked::before,
+.admin-results-panel thead input[type="checkbox"]:checked::before {
+  width: 0.48rem;
+  height: 0.28rem;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  content: "";
+  transform: translateY(-0.06rem) rotate(-45deg);
+}
+
+.admin-row-select:indeterminate,
+.admin-results-panel thead input[type="checkbox"]:indeterminate {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.admin-row-select:indeterminate::before,
+.admin-results-panel thead input[type="checkbox"]:indeterminate::before {
+  width: 0.5rem;
+  height: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.admin-row-select:focus-visible,
+.admin-results-panel thead input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
 }
 
 .admin-row-select {

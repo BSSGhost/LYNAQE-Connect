@@ -85,7 +85,7 @@ async function load(context) {
         '<p class="result-count">' + formatNumber(meta.total) + ' suggestion' + (meta.total > 1 ? 's' : '') + '</p>' +
         bulkToolbarHtml() +
         '<div class="table-wrap"><table class="data-table">' +
-        '<thead><tr><th>Suggestion <input type="checkbox" data-select-all aria-label="Sélectionner toutes les suggestions de cette page" /></th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>' +
+        '<thead><tr><th><label class="admin-select-all-label"><input type="checkbox" data-select-all aria-label="Sélectionner toutes les suggestions de cette page" /><span>Suggestion</span></label></th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>' +
         '<tbody>' + data.map(rowHtml).join('') + '</tbody>' +
         '</table></div>' +
         paginationHtml(meta);
