@@ -5485,25 +5485,23 @@
 
 .admin-results-panel .data-table {
   width: 100%;
-  min-width: 0;
+  min-width: 860px;
   table-layout: fixed;
   font-size: 0.84rem;
 }
 
 .admin-results-panel .data-table th:nth-child(1),
-.admin-results-panel .data-table td:nth-child(1) { width: 24%; }
+.admin-results-panel .data-table td:nth-child(1) { width: 28%; }
 .admin-results-panel .data-table th:nth-child(2),
-.admin-results-panel .data-table td:nth-child(2) { width: 17%; }
+.admin-results-panel .data-table td:nth-child(2) { width: 18%; }
 .admin-results-panel .data-table th:nth-child(3),
-.admin-results-panel .data-table td:nth-child(3) { width: 12%; }
+.admin-results-panel .data-table td:nth-child(3) { width: 14%; }
 .admin-results-panel .data-table th:nth-child(4),
-.admin-results-panel .data-table td:nth-child(4) { width: 10%; }
+.admin-results-panel .data-table td:nth-child(4) { width: 12%; }
 .admin-results-panel .data-table th:nth-child(5),
-.admin-results-panel .data-table td:nth-child(5) { width: 7%; }
+.admin-results-panel .data-table td:nth-child(5) { width: 8%; }
 .admin-results-panel .data-table th:nth-child(6),
-.admin-results-panel .data-table td:nth-child(6) { width: 25%; }
-.admin-results-panel .data-table th:nth-child(7),
-.admin-results-panel .data-table td:nth-child(7) { width: 5%; }
+.admin-results-panel .data-table td:nth-child(6) { width: 20%; }
 
 .admin-results-panel .data-table th {
   padding: 0.8rem 0.85rem;
@@ -5517,6 +5515,10 @@
   padding: 0.8rem 0.85rem;
   vertical-align: middle;
   overflow-wrap: anywhere;
+}
+
+.admin-results-panel .data-table td.cell-actions {
+  display: table-cell;
 }
 
 .admin-results-panel .cell-title {
@@ -5543,24 +5545,6 @@
   margin: 0 0.5rem 0 0;
 }
 
-.admin-quick-actions {
-  min-width: 0;
-}
-
-.admin-quick-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.25rem;
-}
-
-.admin-quick-actions .btn {
-  min-width: 0;
-  min-height: 30px;
-  padding: 0.3rem 0.25rem;
-  font-size: 0.67rem;
-  white-space: nowrap;
-}
-
 .admin-results-panel .data-table .cell-title {
   overflow-wrap: anywhere;
 }
@@ -5575,10 +5559,6 @@
   .admin-results-panel .data-table th,
   .admin-results-panel .data-table td {
     padding-inline: 0.45rem;
-  }
-
-  .admin-quick-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -5652,6 +5632,39 @@
   border-radius: 0.75rem;
   background: var(--surface);
   box-shadow: 0 12px 32px rgba(15, 35, 60, 0.16);
+}
+
+.admin-quick-menu {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 0.25rem;
+  padding: 0.55rem 0.4rem;
+  border-block: 1px solid var(--border);
+}
+
+.admin-quick-menu-title {
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-quick-menu > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.admin-row-menu-panel > .admin-quick-menu button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  justify-content: center;
+  padding: 0.35rem 0.25rem;
+  font-size: 0.7rem;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .admin-row-menu-panel > a,
@@ -5834,8 +5847,7 @@
     grid-template-areas:
       "suggestion suggestion"
       "date status"
-      "support actions"
-      "quick quick";
+      "support actions";
     gap: 0.4rem 0.6rem;
     padding: 0.75rem;
     border: 1px solid var(--border);
@@ -5883,30 +5895,8 @@
   }
 
   .admin-results-panel .data-table tbody tr td:nth-child(6) {
-    grid-area: quick;
-  }
-
-  .admin-results-panel .data-table tbody tr td:nth-child(7) {
     grid-area: actions;
     justify-self: end;
-  }
-
-  .admin-quick-actions {
-    display: flex !important;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    min-width: 0;
-  }
-
-  .admin-quick-actions .btn {
-    flex: 1 1 auto;
-  }
-
-  .admin-quick-actions::before {
-    content: "Actions rapides : ";
-    width: 100%;
-    color: var(--text-soft);
-    font-size: 0.72rem;
   }
 
   .admin-attention-panel {

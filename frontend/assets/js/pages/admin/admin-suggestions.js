@@ -85,7 +85,7 @@ async function load(context) {
         '<p class="result-count">' + formatNumber(meta.total) + ' suggestion' + (meta.total > 1 ? 's' : '') + '</p>' +
         bulkToolbarHtml() +
         '<div class="table-wrap"><table class="data-table">' +
-        '<thead><tr><th>Suggestion <input type="checkbox" data-select-all aria-label="Sélectionner toutes les suggestions de cette page" /></th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions rapides</th><th>Actions</th></tr></thead>' +
+        '<thead><tr><th>Suggestion <input type="checkbox" data-select-all aria-label="Sélectionner toutes les suggestions de cette page" /></th><th>Catégorie</th><th>Date</th><th>Statut</th><th>Soutiens</th><th>Actions</th></tr></thead>' +
         '<tbody>' + data.map(rowHtml).join('') + '</tbody>' +
         '</table></div>' +
         paginationHtml(meta);
@@ -130,11 +130,11 @@ function rowHtml(suggestion) {
   const actionsView = '<a href="' + hrefUrl + '">' + icon('eye', { size: 16 }) + '<span>Voir la suggestion</span></a>';
   const actionsDelete = '<button type="button" data-delete="' + id + '" data-title="' + esc(title) + '">' + icon('trash', { size: 16 }) + '<span>Supprimer</span></button>';
   const visibilityAction = '<button type="button" class="admin-menu-visibility" data-toggle-visibility="' + id + '" data-visibility="' + visibility + '" aria-label="' + (isPublic ? 'Dépublier cette suggestion' : 'Publier cette suggestion') + '">' + icon(isPublic ? 'eyeOff' : 'eye', { size: 16 }) + '<span>' + (isPublic ? 'Dépublier' : 'Publier') + '</span></button>';
-  const cellActions = '<td class="cell-actions"><details class="admin-row-menu"><summary aria-label="Actions pour ' + esc(title) + '">' + icon('dots', { size: 19 }) + '</summary><div class="admin-row-menu-panel">' + actionsView + actionsSelect + visibilityAction + actionsDelete + '</div></details></td>';
-  const quickActions = '<td class="admin-quick-actions">' + QUICK_ACTIONS.map((action) =>
+  const quickActions = '<div class="admin-quick-menu"><span class="admin-quick-menu-title">Actions rapides</span><div>' + QUICK_ACTIONS.map((action) =>
     '<button class="btn btn-outline btn-sm" type="button" data-quick-status="' + esc(action.status) + '" data-quick-for="' + id + '"' +
       (action.status === suggestion.status ? ' disabled' : '') + '>' + esc(action.label) + '</button>',
-  ).join('') + '</td>';
+  ).join('') + '</div></div>';
+  const cellActions = '<td class="cell-actions"><details class="admin-row-menu"><summary aria-label="Actions pour ' + esc(title) + '">' + icon('dots', { size: 19 }) + '</summary><div class="admin-row-menu-panel">' + actionsView + quickActions + actionsSelect + visibilityAction + actionsDelete + '</div></details></td>';
 
   return '<tr data-row="' + id + '">' +
     '<td>' +
@@ -146,7 +146,6 @@ function rowHtml(suggestion) {
     '<td class="cell-date">' + esc(formatDate(createdAt)) + '</td>' +
     '<td class="cell-status"><span class="badge tone-' + tone + '"><span class="dot"></span>' + esc(statusValue) + '</span></td>' +
     '<td>' + formatNumber(supportCount) + '</td>' +
-    quickActions +
     cellActions +
     '</tr>';
 }
@@ -220,6 +219,7 @@ function wireRows(container) {
       try {
         const { data } = await adminApi.changeStatus(id, { status });
         updateRowStatus(container, id, data.suggestion);
+        button.closest('.admin-row-menu')?.removeAttribute('open');
         toast('Statut mis à jour : ' + status + '.', 'success');
       } catch (error) {
         handleAdminError(error);
