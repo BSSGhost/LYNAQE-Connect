@@ -1,0 +1,4 @@
+# Normalisation Git pour tout le projet
+# Tous les fichiers texte sont stockes et checkoutes avec des fins de ligne LF.
+# Les fichiers binaires sont detectes automatiquement par Git.
+* text=auto eol=lf
