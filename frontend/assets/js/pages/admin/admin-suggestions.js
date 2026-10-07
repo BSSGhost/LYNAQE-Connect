@@ -30,14 +30,6 @@ const SORTS = [
   { value: 'status', label: 'Par statut' },
 ];
 
-const QUICK_ACTIONS = [
-  { status: 'Reçue', label: 'Recevoir' },
-  { status: 'À l’étude', label: 'Étudier' },
-  { status: 'En cours', label: 'En cours' },
-  { status: 'Réalisée', label: 'Réalisée' },
-  { status: 'Non retenue', label: 'Rejeter' },
-];
-
 export async function render(context) {
   if (!guardAdmin()) return;
 
@@ -110,7 +102,6 @@ async function load(context) {
 function rowHtml(suggestion) {
   const statusMeta = getStatusMeta(suggestion.status);
   const tone = statusMeta ? statusMeta.tone : 'neutral';
-  const statusValue = statusMeta ? statusMeta.value : suggestion.status;
   const id = suggestion.id;
   const title = suggestion.title || '';
   const trackingCode = suggestion.trackingCode || '';
@@ -126,15 +117,19 @@ function rowHtml(suggestion) {
   const visibility = suggestion.visibility || 'privee';
   const isPublic = visibility === 'publique';
 
-  const actionsSelect = '<label class="admin-menu-field">Changer le statut<select class="status-select" data-status-for="' + id + '" aria-label="Changer le statut">' + statusOptions + '</select></label>';
-  const actionsView = '<a href="' + hrefUrl + '">' + icon('eye', { size: 16 }) + '<span>Voir la suggestion</span></a>';
   const actionsDelete = '<button type="button" data-delete="' + id + '" data-title="' + esc(title) + '">' + icon('trash', { size: 16 }) + '<span>Supprimer</span></button>';
   const visibilityAction = '<button type="button" class="admin-menu-visibility" data-toggle-visibility="' + id + '" data-visibility="' + visibility + '" aria-label="' + (isPublic ? 'Dépublier cette suggestion' : 'Publier cette suggestion') + '">' + icon(isPublic ? 'eyeOff' : 'eye', { size: 16 }) + '<span>' + (isPublic ? 'Dépublier' : 'Publier') + '</span></button>';
-  const quickActions = '<div class="admin-quick-menu"><span class="admin-quick-menu-title">Actions rapides</span><div>' + QUICK_ACTIONS.map((action) =>
-    '<button class="btn btn-outline btn-sm" type="button" data-quick-status="' + esc(action.status) + '" data-quick-for="' + id + '"' +
-      (action.status === suggestion.status ? ' disabled' : '') + '>' + esc(action.label) + '</button>',
-  ).join('') + '</div></div>';
-  const cellActions = '<td class="cell-actions"><details class="admin-row-menu"><summary aria-label="Actions pour ' + esc(title) + '">' + icon('dots', { size: 19 }) + '</summary><div class="admin-row-menu-panel">' + actionsView + quickActions + actionsSelect + visibilityAction + actionsDelete + '</div></details></td>';
+  const cellActions = '<td class="cell-actions"><div class="admin-row-actions">' +
+    '<a class="btn btn-outline btn-sm admin-view-action" href="' + hrefUrl + '" aria-label="Voir la suggestion : ' + esc(title) + '">' +
+    icon('eye', { size: 16 }) + '<span>Voir</span></a>' +
+    '<details class="admin-row-menu"><summary aria-label="Autres actions pour ' + esc(title) + '">' +
+    icon('dots', { size: 19 }) + '</summary><div class="admin-row-menu-panel">' +
+    visibilityAction + actionsDelete + '</div></details></div></td>';
+
+  const statusControl = '<label class="admin-status-control tone-' + tone + '" data-status-control data-current-status="' + esc(suggestion.status) + '">' +
+    '<span class="admin-status-indicator" aria-hidden="true"></span>' +
+    '<select data-status-for="' + id + '" aria-label="Modifier le statut de : ' + esc(title) + '">' + statusOptions + '</select>' +
+    '</label>';
 
   return '<tr data-row="' + id + '">' +
     '<td>' +
@@ -144,7 +139,7 @@ function rowHtml(suggestion) {
     '</td>' +
     '<td>' + esc(category) + '</td>' +
     '<td class="cell-date">' + esc(formatDate(createdAt)) + '</td>' +
-    '<td class="cell-status"><span class="badge tone-' + tone + '"><span class="dot"></span>' + esc(statusValue) + '</span></td>' +
+    '<td class="cell-status">' + statusControl + '</td>' +
     '<td>' + formatNumber(supportCount) + '</td>' +
     cellActions +
     '</tr>';
@@ -211,37 +206,31 @@ function wireFilters(main, query) {
 }
 
 function wireRows(container) {
-  container.querySelectorAll('[data-quick-for]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const id = button.getAttribute('data-quick-for');
-      const status = button.getAttribute('data-quick-status');
-      button.disabled = true;
-      try {
-        const { data } = await adminApi.changeStatus(id, { status });
-        updateRowStatus(container, id, data.suggestion);
-        button.closest('.admin-row-menu')?.removeAttribute('open');
-        toast('Statut mis à jour : ' + status + '.', 'success');
-      } catch (error) {
-        handleAdminError(error);
-        button.disabled = false;
-      }
-    });
-  });
-
   container.querySelectorAll('[data-status-for]').forEach((select) => {
     select.addEventListener('change', async () => {
       const id = select.getAttribute('data-status-for');
       const status = select.value;
+      const previousStatus = select.closest('[data-status-control]')?.getAttribute('data-current-status');
+      const statusControl = select.closest('[data-status-control]');
+      if (status === previousStatus) return;
+
       select.disabled = true;
+      setStatusControlStatus(statusControl, status);
+      statusControl?.classList.add('is-loading');
+      statusControl?.setAttribute('aria-busy', 'true');
 
       try {
         const { data } = await adminApi.changeStatus(id, { status });
         updateRowStatus(container, id, data.suggestion);
         toast('Statut mis à jour : ' + status + '.', 'success');
       } catch (error) {
+        select.value = previousStatus;
+        setStatusControlStatus(statusControl, previousStatus);
         handleAdminError(error);
       } finally {
         select.disabled = false;
+        statusControl?.classList.remove('is-loading');
+        statusControl?.removeAttribute('aria-busy');
       }
     });
   });
@@ -366,14 +355,8 @@ function updateRowStatus(container, id, suggestion) {
   const row = container.querySelector('[data-row="' + id + '"]');
   if (!row || !suggestion) return;
 
-  const statusMeta = getStatusMeta(suggestion.status);
-  const tone = statusMeta ? statusMeta.tone : 'neutral';
-  const label = suggestion.statusInfo && suggestion.statusInfo.value ? suggestion.statusInfo.value : suggestion.status;
-
-  const statusEl = row.querySelector('.cell-status');
-  if (statusEl) {
-    statusEl.innerHTML = '<span class="badge tone-' + tone + '"><span class="dot"></span>' + esc(label) + '</span>';
-  }
+  const statusControl = row.querySelector('[data-status-control]');
+  setStatusControlStatus(statusControl, suggestion.status);
 
   const toggle = row.querySelector('[data-toggle-visibility]');
   if (toggle) {
@@ -382,12 +365,18 @@ function updateRowStatus(container, id, suggestion) {
     toggle.setAttribute('aria-label', isPublic ? 'Dépublier cette suggestion' : 'Publier cette suggestion');
     toggle.innerHTML = icon(isPublic ? 'eyeOff' : 'eye', { size: 16 }) + '<span>' + (isPublic ? 'Dépublier' : 'Publier') + '</span>';
   }
+}
 
-  const select = row.querySelector('[data-status-for]');
-  if (select) select.value = suggestion.status;
-  row.querySelectorAll('[data-quick-status]').forEach((button) => {
-    button.disabled = button.getAttribute('data-quick-status') === suggestion.status;
-  });
+function setStatusControlStatus(control, status) {
+  if (!control || !status) return;
+  const select = control.querySelector('[data-status-for]');
+  if (!select) return;
+
+  const statusMeta = getStatusMeta(status);
+  const tone = statusMeta ? statusMeta.tone : 'neutral';
+  control.className = 'admin-status-control tone-' + tone;
+  control.setAttribute('data-current-status', status);
+  select.value = status;
 }
 
 function wirePagination(container, query) {
