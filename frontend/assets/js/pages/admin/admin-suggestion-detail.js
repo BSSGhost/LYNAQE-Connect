@@ -142,8 +142,7 @@ function detailHtml(data) {
           </div>
 
           <div class="admin-actions-footer">
-            <button class="btn btn-outline btn-sm" type="button" id="apply-status">${icon('check', { size: 16 })} Enregistrer le statut</button>
-            <button class="btn btn-outline btn-sm" type="button" id="apply-moderation">${icon('shieldCheck', { size: 16 })} Enregistrer la modération</button>
+            <button class="btn btn-outline btn-sm" type="button" id="apply-admin-changes">${icon('check', { size: 16 })} Enregistrer les modifications</button>
           </div>
           ${s.visibility === 'publique' ? `<button class="btn btn-outline btn-sm monthly-idea-action" type="button" data-monthly-idea>${icon('trophy', { size: 16 })} ${s.isMonthlyIdea ? 'Retirer l’idée du mois' : 'Choisir comme idée du mois'}</button>` : ''}
           <button class="btn btn-outline btn-sm danger admin-delete-action" type="button" data-action="delete" data-title="${esc(s.title)}">${icon('trash', { size: 16 })} Supprimer la suggestion</button>
@@ -349,13 +348,17 @@ function wireActions(main, suggestion, refresh) {
     });
   });
 
-  main.querySelector('#apply-status').addEventListener('click', async () => {
-    const button = main.querySelector('#apply-status');
+  main.querySelector('#apply-admin-changes').addEventListener('click', async () => {
+    const button = main.querySelector('#apply-admin-changes');
     const status = main.querySelector('#status-select').value;
     const message = main.querySelector('#status-message').value.trim();
     const publish = main.querySelector('#status-publish').checked;
     const progressPercent = main.querySelector('#progress-percent')?.value;
     const expectedCompletionDate = main.querySelector('#expected-completion-date')?.value;
+    const visibility = main.querySelector('#moderation-visibility').value;
+    const moderationNote = main.querySelector('#moderation-note').value.trim();
+    let statusSaved = false;
+
     button.disabled = true;
     try {
       await adminApi.changeStatus(suggestion.id, {
@@ -369,9 +372,18 @@ function wireActions(main, suggestion, refresh) {
             }
           : {}),
       });
-      toast(`Statut mis à jour : ${status}.`, 'success');
+      statusSaved = true;
+      await adminApi.moderate(suggestion.id, {
+        visibility,
+        moderationNote: moderationNote || undefined,
+      });
+      toast('Les modifications administratives ont été enregistrées.', 'success');
       await refresh();
     } catch (error) {
+      if (statusSaved) {
+        await refresh();
+        toast('Le statut a été enregistré, mais la modération n’a pas pu être enregistrée.', 'warning');
+      }
       handleAdminError(error);
     } finally {
       button.disabled = false;
@@ -416,17 +428,6 @@ function wireActions(main, suggestion, refresh) {
         button.disabled = false;
       }
     });
-  });
-
-  main.querySelector('#apply-moderation').addEventListener('click', async () => {
-    const visibility = main.querySelector('#moderation-visibility').value;
-    const moderationNote = main.querySelector('#moderation-note').value.trim();
-    try {
-      await adminApi.moderate(suggestion.id, { visibility, moderationNote: moderationNote || undefined });
-      toast('Modération mise à jour.', 'success');
-    } catch (error) {
-      handleAdminError(error);
-    }
   });
 
   main.querySelector('[data-action="delete"]').addEventListener('click', async (event) => {
