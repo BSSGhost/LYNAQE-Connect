@@ -6791,7 +6791,7 @@
 .admin-photo-button {
   display: grid;
   min-width: 0;
-  aspect-ratio: 4 / 3;
+  /* Removed aspect-ratio: 4 / 3 to allow photos of any aspect ratio */
   place-items: center;
   overflow: hidden;
   padding: 0;
@@ -6811,8 +6811,9 @@
 .admin-photo-button img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  /* Changed from object-fit: cover to object-fit: contain */
+  object-fit: contain;
   transition: transform 160ms ease;
 }
 
@@ -6843,15 +6844,16 @@
   place-items: center;
   padding: clamp(0.75rem, 3vw, 2rem);
   background: rgba(5, 14, 28, 0.88);
+  overflow: visible;
 }
 
 .photo-viewer {
   position: relative;
   display: grid;
   width: min(100%, 1100px);
-  height: auto;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* height removed */
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
   align-items: center;
   justify-items: center;
   gap: 0.75rem;
